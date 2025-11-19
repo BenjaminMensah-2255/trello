@@ -1,263 +1,121 @@
-'use client';
+"use client"
 
-import { useState, useEffect } from 'react';
-
-type PasswordStrength = 'weak' | 'medium' | 'strong';
+import { useState, useEffect, FormEvent } from 'react'
+import { createClient } from '../lib/supabase'
+import { useRouter } from 'next/navigation'
+import { Session } from '@supabase/supabase-js'
 
 export default function ResetPasswordForm() {
-  const [formData, setFormData] = useState({
-    newPassword: '',
-    confirmPassword: ''
-  });
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [passwordStrength, setPasswordStrength] = useState<PasswordStrength>('weak');
-  const [strengthPercentage, setStrengthPercentage] = useState(0);
-  const [requirements, setRequirements] = useState({
-    minLength: false,
-    hasUppercase: false,
-    hasNumber: false,
-    hasSpecialChar: false
-  });
-
-  const checkPasswordStrength = (password: string) => {
-    let strength = 0;
-    const newRequirements = {
-      minLength: password.length >= 8,
-      hasUppercase: /[A-Z]/.test(password),
-      hasNumber: /[0-9]/.test(password),
-      hasSpecialChar: /[!@#$%^&*(),.?":{}|<>]/.test(password)
-    };
-
-    // Calculate strength
-    if (newRequirements.minLength) strength += 25;
-    if (newRequirements.hasUppercase) strength += 25;
-    if (newRequirements.hasNumber) strength += 25;
-    if (newRequirements.hasSpecialChar) strength += 25;
-
-    setStrengthPercentage(strength);
-    setRequirements(newRequirements);
-
-    if (strength < 50) return 'weak';
-    if (strength < 75) return 'medium';
-    return 'strong';
-  };
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
+  const router = useRouter()
+  const supabase = createClient()
 
   useEffect(() => {
-    if (formData.newPassword) {
-      const strength = checkPasswordStrength(formData.newPassword);
-      setPasswordStrength(strength);
-    } else {
-      setPasswordStrength('weak');
-      setStrengthPercentage(0);
-    }
-  }, [formData.newPassword]);
+    // Check if we have a session (user clicked the reset link)
+    supabase.auth.getSession().then(({ data: { session } }: { data: { session: Session | null } }) => {
+      if (!session) {
+        router.push('/login')
+      }
+    })
+  }, [router, supabase])
 
-  const getStrengthColor = () => {
-    switch (passwordStrength) {
-      case 'weak': return 'bg-red-500';
-      case 'medium': return 'bg-yellow-500';
-      case 'strong': return 'bg-green-500';
-      default: return 'bg-red-500';
-    }
-  };
+  const handleResetPassword = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
 
-  const getStrengthText = () => {
-    switch (passwordStrength) {
-      case 'weak': return 'Weak';
-      case 'medium': return 'Medium';
-      case 'strong': return 'Strong';
-      default: return 'Weak';
-    }
-  };
-
-  const getStrengthTextColor = () => {
-    switch (passwordStrength) {
-      case 'weak': return 'text-red-600';
-      case 'medium': return 'text-yellow-600';
-      case 'strong': return 'text-green-600';
-      default: return 'text-red-600';
-    }
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (formData.newPassword !== formData.confirmPassword) {
-      alert("Passwords don't match!");
-      return;
+    if (password !== confirmPassword) {
+      setError('Passwords do not match')
+      setLoading(false)
+      return
     }
 
-    if (passwordStrength === 'weak') {
-      alert("Please choose a stronger password!");
-      return;
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: password,
+      })
+
+      if (error) throw error
+
+      setMessage('Password updated successfully!')
+      setTimeout(() => {
+        router.push('/login')
+      }, 2000)
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        setError(error.message)
+      } else {
+        setError('An unexpected error occurred')
+      }
+    } finally {
+      setLoading(false)
     }
-
-    // Handle password reset logic here
-    console.log('Password reset:', formData.newPassword);
-    alert('Password has been reset successfully!');
-  };
-
-  const getRequirementIcon = (met: boolean) => {
-    return met ? 'check_circle' : 'radio_button_unchecked';
-  };
-
-  const getRequirementColor = (met: boolean) => {
-    return met ? 'text-green-500' : 'text-text-secondary-light';
-  };
+  }
 
   return (
-    <div className="flex flex-1 items-center justify-center p-4 sm:p-6 lg:p-8 bg-card-light">
-      <div className="flex w-full max-w-md flex-col gap-8 py-10">
-        {/* Logo and Header */}
-        <div className="flex flex-col items-center text-center gap-4">
-          <span className="material-symbols-outlined text-primary text-5xl">
-            lock_reset
-          </span>
-          <div className="flex flex-col gap-2">
-            <h1 className="text-3xl font-bold tracking-tight text-text-primary-light">
-              Reset Password
-            </h1>
-            <p className="text-text-secondary-light">
-              Create a new, strong password for your account
-            </p>
-          </div>
+    <div className="flex flex-1 items-center justify-center p-8 bg-background">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-text-primary mb-2">Set New Password</h1>
+          <p className="text-text-secondary">Create a strong new password for your account</p>
         </div>
 
-        <form className="flex flex-col gap-6" onSubmit={handleSubmit}>
-          <div className="flex flex-col gap-4">
-            {/* New Password Field */}
-            <label className="flex flex-col w-full">
-              <p className="text-sm font-medium leading-normal pb-2 text-text-primary-light">
-                New Password
-              </p>
-              <div className="relative flex w-full flex-1 items-center">
-                <input
-                  className="flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-text-primary-light focus:outline-0 border border-border-light bg-transparent focus:border-primary focus:ring-4 focus:ring-primary/20 h-12 placeholder:text-text-secondary-light p-3 pr-10 text-base font-normal leading-normal"
-                  placeholder="Enter your new password"
-                  type={showNewPassword ? 'text' : 'password'}
-                  name="newPassword"
-                  value={formData.newPassword}
-                  onChange={handleChange}
-                  required
-                />
-                <button
-                  type="button"
-                  className="absolute right-3 text-text-secondary-light hover:text-text-primary-light transition-colors"
-                  onClick={() => setShowNewPassword(!showNewPassword)}
-                >
-                  <span className="material-symbols-outlined">
-                    {showNewPassword ? 'visibility_off' : 'visibility'}
-                  </span>
-                </button>
-              </div>
-            </label>
-
-            {/* Password Strength Indicator */}
-            <div className="flex flex-col gap-2">
-              <div className="flex justify-between">
-                <p className="text-sm font-medium text-text-primary-light">Password Strength</p>
-                <p className={`text-sm font-medium ${getStrengthTextColor()}`}>
-                  {getStrengthText()}
-                </p>
-              </div>
-              <div className="h-2 w-full rounded-full bg-gray-200">
-                <div 
-                  className={`h-2 rounded-full transition-all duration-300 ${getStrengthColor()}`}
-                  style={{ width: `${strengthPercentage}%` }}
-                ></div>
-              </div>
+        <form onSubmit={handleResetPassword} className="space-y-6">
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg">
+              {error}
             </div>
+          )}
 
-            {/* Confirm New Password Field */}
-            <label className="flex flex-col w-full">
-              <p className="text-sm font-medium leading-normal pb-2 text-text-primary-light">
-                Confirm New Password
-              </p>
-              <div className="relative flex w-full flex-1 items-center">
-                <input
-                  className="flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-text-primary-light focus:outline-0 border border-border-light bg-transparent focus:border-primary focus:ring-4 focus:ring-primary/20 h-12 placeholder:text-text-secondary-light p-3 pr-10 text-base font-normal leading-normal"
-                  placeholder="Confirm your new password"
-                  type={showConfirmPassword ? 'text' : 'password'}
-                  name="confirmPassword"
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  required
-                />
-                <button
-                  type="button"
-                  className="absolute right-3 text-text-secondary-light hover:text-text-primary-light transition-colors"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                >
-                  <span className="material-symbols-outlined">
-                    {showConfirmPassword ? 'visibility_off' : 'visibility'}
-                  </span>
-                </button>
-              </div>
-            </label>
-
-            {/* Password Requirements */}
-            <div className="flex flex-col gap-2 rounded-lg bg-gray-50 p-4 border border-gray-200">
-              <p className="text-sm font-medium text-text-primary-light">Password must contain:</p>
-              <ul className="space-y-1 text-sm text-text-secondary-light">
-                <li className="flex items-center gap-2">
-                  <span className={`material-symbols-outlined text-base ${getRequirementColor(requirements.minLength)}`}>
-                    {getRequirementIcon(requirements.minLength)}
-                  </span>
-                  <span>At least 8 characters</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className={`material-symbols-outlined text-base ${getRequirementColor(requirements.hasUppercase)}`}>
-                    {getRequirementIcon(requirements.hasUppercase)}
-                  </span>
-                  <span>1 uppercase letter</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className={`material-symbols-outlined text-base ${getRequirementColor(requirements.hasNumber)}`}>
-                    {getRequirementIcon(requirements.hasNumber)}
-                  </span>
-                  <span>1 number</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className={`material-symbols-outlined text-base ${getRequirementColor(requirements.hasSpecialChar)}`}>
-                    {getRequirementIcon(requirements.hasSpecialChar)}
-                  </span>
-                  <span>1 special character</span>
-                </li>
-              </ul>
+          {message && (
+            <div className="bg-green-50 border border-green-200 text-green-600 px-4 py-3 rounded-lg">
+              {message}
             </div>
+          )}
+
+          <div>
+            <label htmlFor="password" className="block text-sm font-medium text-text-primary mb-2">
+              New Password
+            </label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className="w-full px-4 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              placeholder="Enter new password"
+            />
           </div>
 
-          {/* Reset Password Button */}
+          <div>
+            <label htmlFor="confirmPassword" className="block text-sm font-medium text-text-primary mb-2">
+              Confirm New Password
+            </label>
+            <input
+              id="confirmPassword"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+              className="w-full px-4 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              placeholder="Confirm new password"
+            />
+          </div>
+
           <button
             type="submit"
-            className="flex items-center justify-center whitespace-nowrap h-12 px-6 rounded-lg w-full bg-primary text-white text-base font-semibold hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 transition-colors"
+            disabled={loading}
+            className="w-full bg-primary text-white py-3 px-4 rounded-lg hover:bg-primary-dark focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Reset Password
+            {loading ? 'Updating Password...' : 'Update Password'}
           </button>
         </form>
-
-        {/* Footer Link */}
-        <div className="text-center">
-          <p className="text-sm text-text-secondary-light">
-            Remember your password?{' '}
-            <a
-              className="font-semibold text-primary hover:underline"
-              href="/login"
-            >
-              Back to Login
-            </a>
-          </p>
-        </div>
       </div>
     </div>
-  );
+  )
 }

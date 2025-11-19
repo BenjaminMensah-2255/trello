@@ -1,111 +1,111 @@
-'use client';
-
-import { useState } from 'react';
+"use client"
+import { useState, FormEvent } from 'react'
+import { createClient } from '../lib/supabase'
+import { useRouter } from 'next/navigation'
 
 export default function LoginForm() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const router = useRouter()
+  const supabase = createClient()
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Handle login logic here
-    console.log('Login attempt:', { email, password });
-  };
+  const handleLogin = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (error) throw error
+
+      // Redirect to dashboard or home page
+      router.push('/dashboard')
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        setError(error.message)
+      } else {
+        setError('An unexpected error occurred')
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
-    <div className="flex flex-1 items-center justify-center p-4 sm:p-6 lg:p-8 bg-card-light">
-      <div className="flex w-full max-w-md flex-col gap-8 py-10">
-        {/* Logo and Header */}
-        <div className="flex flex-col items-center text-center gap-4">
-          <span className="material-symbols-outlined text-primary text-5xl">
-            deployed_code
-          </span>
-          <div className="flex flex-col gap-2">
-            <h1 className="text-3xl font-bold tracking-tight text-text-primary-light">
-              Welcome back
-            </h1>
-            <p className="text-text-secondary-light">
-              Log in to your account to continue
-            </p>
-          </div>
+    <div className="flex flex-1 items-center justify-center p-8 bg-background">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-text-primary mb-2">Welcome Back</h1>
+          <p className="text-text-secondary">Sign in to your ProjectFlow account</p>
         </div>
 
-        {/* Form */}
-        <form className="flex flex-col gap-6" onSubmit={handleSubmit}>
-          <div className="flex flex-col gap-4">
-            {/* Email Field */}
-            <label className="flex flex-col w-full">
-              <p className="text-sm font-medium leading-normal pb-2 text-text-primary-light">
-                Email Address
-              </p>
-              <input
-                className="flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-text-primary-light focus:outline-0 border border-border-light bg-transparent focus:border-primary focus:ring-4 focus:ring-primary/20 h-12 placeholder:text-text-secondary-light p-3 text-base font-normal leading-normal"
-                placeholder="you@example.com"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </label>
-
-            {/* Password Field */}
-            <div className="flex flex-col gap-2">
-              <label className="flex flex-col w-full">
-                <p className="text-sm font-medium leading-normal pb-2 text-text-primary-light">
-                  Password
-                </p>
-                <div className="relative flex w-full flex-1 items-center">
-                  <input
-                    className="flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-text-primary-light focus:outline-0 border border-border-light bg-transparent focus:border-primary focus:ring-4 focus:ring-primary/20 h-12 placeholder:text-text-secondary-light p-3 pr-10 text-base font-normal leading-normal"
-                    placeholder="Enter your password"
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                  <button
-                    type="button"
-                    className="absolute right-3 text-text-secondary-light hover:text-text-primary-light transition-colors"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    <span className="material-symbols-outlined">
-                      {showPassword ? 'visibility_off' : 'visibility'}
-                    </span>
-                  </button>
-                </div>
-              </label>
-              <a
-                className="text-sm font-medium text-primary hover:underline self-end"
-                href="/forgot-password"
-              >
-                Forgot Password?
-              </a>
+        <form onSubmit={handleLogin} className="space-y-6">
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg">
+              {error}
             </div>
+          )}
+
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium text-text-primary mb-2">
+              Email Address
+            </label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="w-full px-4 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              placeholder="Enter your email"
+            />
           </div>
 
-          {/* Login Button */}
+          <div>
+            <label htmlFor="password" className="block text-sm font-medium text-text-primary mb-2">
+              Password
+            </label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className="w-full px-4 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              placeholder="Enter your password"
+            />
+          </div>
+
           <button
             type="submit"
-            className="flex items-center justify-center whitespace-nowrap h-12 px-6 rounded-lg w-full bg-primary text-white text-base font-semibold hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 transition-colors"
+            disabled={loading}
+            className="w-full bg-primary text-white py-3 px-4 rounded-lg hover:bg-primary-dark focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Login
+            {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
 
-        {/* Footer Link */}
-        <div className="text-center">
-          <p className="text-sm text-text-secondary-light">
+        <div className="mt-6 text-center">
+          <a href="/forgot-password" className="text-primary hover:text-primary-dark text-sm">
+            Forgot your password?
+          </a>
+        </div>
+
+        <div className="mt-4 text-center">
+          <span className="text-text-secondary text-sm">
             Don't have an account?{' '}
-            <a
-              className="font-semibold text-primary hover:underline"
-              href="/signup"
-            >
-              Register
+            <a href="/signup" className="text-primary hover:text-primary-dark font-medium">
+              Sign up
             </a>
-          </p>
+          </span>
         </div>
       </div>
     </div>
-  );
+  )
 }

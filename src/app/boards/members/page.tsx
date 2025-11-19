@@ -1,49 +1,92 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { createClient } from '../../lib/supabase';
+import { useOrganization } from '../../contexts/OrganizationContext';
+
+interface Member {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  avatar?: string;
+}
 
 export default function MembersPage() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [members, setMembers] = useState([
-    {
-      id: '1',
-      name: 'Alex Johnson',
-      role: 'Admin',
-      avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBLWT0SaUUAR3O1PCq84cH8IAzzlkNLrgocTBbv6cG8aLroVeTCKmFCpcEpcNNsVdaVBvUwe2Y1Xwmq9TtJj324u4KA6Inq3llghqHiGAOMAtsstrqLuTlO0VaigQHiTISmXYSAaFxfshr8JK5g-KSarYcoHURwuNiutC4sLJuX5RzZou-wLhcUWZVh-3Q_j9gtaCY08yUnup-6c16qIRd4eg2AnA8pcCswVmJedg_FqxGUbNsXHk8jh38yaPkZXIcVWkMMJaYST9ae',
-      altText: 'Avatar of Alex Johnson'
-    },
-    {
-      id: '2',
-      name: 'Maria Garcia',
-      role: 'Editor',
-      avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuB5UTx3i2iQeigYiS9bwAHfdby0CqTrBerBJozzTFmvPFeT8kIzGxr8LvkgPH7mr_w74oDN8Pnazni6Xe2rLuImh75lzaXsr5uFX3UArnsiQoGkgF4JKsoKXLFNfKAh9mCkDZYFaJAk-pRjPe3NewvRa6ADiDlxrvQBQ-aYwqlqxl6oXXs_r39u4tBk7Gx1LDhRMUlibT665s9jT-aY60xPJtUsnSZ_oj8h5-E4sO9J5ZqM_jO6jBN7_GLiE9oRHfkiqr9n26Vq8Hy2',
-      altText: 'Avatar of Maria Garcia'
-    },
-    {
-      id: '3',
-      name: 'Chen Wei',
-      role: 'Member',
-      avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBRW5VjQgty3KvOuQKCoXUTJJ1mV17hEGWitNAKXzdPOrsLeXrZsE0hl1H5-u3iSJ7avyyLr1af2jsx28XjxwYyISKAYsdSf6a7JL0Swjzq7APGxjEUjfRn5Z1tcm-FY7Yh6cXCYHFB9ZxSWrwTrlX_WYP9VJBBbLpbfonvKeKEGr3kPMST3KYyOOYqD9WBXES5tX8V_ZKH5fxtPlxqYpDK4WMZy4hqbusCEjoLfd9dzDtInliK2-xbloZn_5bhsQBMiCz5QYX4J6rm',
-      altText: 'Avatar of Chen Wei'
-    },
-    {
-      id: '4',
-      name: 'Fatima Al-Fassi',
-      role: 'Guest',
-      avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDny1upBxsq04h3sW4A2Wd3X2N1WVsoj7ZUkEEDCJK6vIRh3dZugibKR-tv_qbSiJELKMlFaejvlOPZDf2GbM8cjUy6bmXJrn30mcC6X19NPd8MNOWuExAnp1D3UALUIwTPe2h3pBFPEA1Z0kfPyFx2kcn0K9vE60fvLEwKcc8L0jfLCsmmQl6bV7GtZurtmdxGORT_h41DKkhdCik-IQoQe1oPtp43avPds_RLDi-SEHUbvHa9tUQX3CKatdtB57uRPrk82SnAqsje',
-      altText: 'Avatar of Fatima Al-Fassi'
-    }
-  ]);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { selectedOrganization } = useOrganization();
+  const supabase = createClient();
 
-  const removeMember = (memberId: string) => {
-    setMembers(members.filter(member => member.id !== memberId));
+  useEffect(() => {
+    if (selectedOrganization) {
+      fetchMembers();
+    }
+  }, [selectedOrganization]);
+
+  const fetchMembers = async () => {
+    if (!selectedOrganization) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('organization_members')
+        .select(`
+          role,
+          user_id,
+          users (
+            id,
+            email,
+            user_metadata
+          )
+        `)
+        .eq('organization_id', selectedOrganization.id);
+
+      if (error) throw error;
+
+      const formattedMembers: Member[] = (data || []).map(member => ({
+        id: member.user_id,
+        name: member.users.user_metadata?.full_name || member.users.email.split('@')[0],
+        email: member.users.email,
+        role: member.role,
+        avatar: member.users.user_metadata?.avatar_url
+      }));
+
+      setMembers(formattedMembers);
+    } catch (error) {
+      console.error('Error fetching members:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const removeMember = async (memberId: string) => {
+    if (!selectedOrganization) return;
+
+    try {
+      const { error } = await supabase
+        .from('organization_members')
+        .delete()
+        .eq('organization_id', selectedOrganization.id)
+        .eq('user_id', memberId);
+
+      if (error) throw error;
+
+      // Refresh the list
+      await fetchMembers();
+    } catch (error) {
+      console.error('Error removing member:', error);
+      alert('Error removing member. Please try again.');
+    }
   };
 
   const filteredMembers = members.filter(member =>
     member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    member.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
     member.role.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
 
   return (
     <div className="max-w-4xl mx-auto">

@@ -1,9 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useOrganization } from '../../contexts/OrganizationContext';
+import { createClient } from '../../lib/supabase';
 import AdvancedDraggableWorkspace from '../../components/AdvancedDraggableWorkspace';
 import CardModal from '../../components/CardModal';
 
+// Use the same Card interface as in CardModal
 interface Card {
   id: string;
   title: string;
@@ -15,30 +19,91 @@ interface Card {
   priority?: 'high' | 'medium';
   assignee?: string;
   assignees?: string[];
+  column_id?: string;
+  position?: number;
 }
 
 export default function WorkspacePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const { selectedOrganization, selectedBoard } = useOrganization();
+  const router = useRouter();
+  const supabase = createClient();
+
+  useEffect(() => {
+    // Redirect if no board is selected
+    if (!selectedBoard || !selectedOrganization) {
+      router.push('/boards');
+      return;
+    }
+  }, [selectedBoard, selectedOrganization, router]);
 
   const handleCardClick = (card: Card) => {
+    console.log('Workspace: Card clicked:', card);
     setSelectedCard(card);
     setIsModalOpen(true);
   };
 
   const handleCloseModal = () => {
+    console.log('Workspace: Closing modal');
     setIsModalOpen(false);
     setSelectedCard(null);
   };
 
-  const handleSaveCard = (updatedCard: Card) => {
-    // Here you would update the card in your state/backend
-    console.log('Saving card:', updatedCard);
-    // For now, we'll just close the modal
-    setIsModalOpen(false);
-    setSelectedCard(null);
+  const handleSaveCard = async (updatedCard: Card) => {
+    console.log('Workspace: Saving card:', updatedCard);
+    
+    try {
+      // Prepare the data for Supabase
+      const cardData = {
+        title: updatedCard.title,
+        description: updatedCard.description || null,
+        due_date: updatedCard.dueDate || null,
+        priority: updatedCard.priority || 'medium',
+        attachments: updatedCard.attachments || 0,
+        comments: updatedCard.comments || 0,
+        updated_at: new Date().toISOString()
+      };
+
+      console.log('Workspace: Updating card with data:', cardData);
+
+      const { data, error } = await supabase
+        .from('cards')
+        .update(cardData)
+        .eq('id', updatedCard.id)
+        .select();
+
+      if (error) {
+        console.error('Workspace: Supabase error:', error);
+        throw error;
+      }
+
+      console.log('Workspace: Card saved successfully:', data);
+      
+      // Close modal after successful save
+      setIsModalOpen(false);
+      setSelectedCard(null);
+
+      // You might want to refresh the workspace data here
+      // or update the local state to reflect changes
+      // For now, let's just show a success message
+      alert('Card saved successfully!');
+
+    } catch (error) {
+      console.error('Workspace: Error saving card:', error);
+      alert('Error saving card. Please check console for details.');
+    }
   };
+
+  // If no board is selected, show loading or redirect
+  if (!selectedBoard || !selectedOrganization) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-lg">Loading workspace...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden bg-background-light">
@@ -48,10 +113,10 @@ export default function WorkspacePage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-72 flex-col gap-2">
             <h1 className="text-3xl font-black leading-tight tracking-[-0.03em] text-slate-900">
-              Q4 Marketing Campaign
+              {selectedBoard.title}
             </h1>
             <p className="text-base font-normal leading-normal text-slate-500">
-              Manage all marketing tasks for the final quarter.
+              {selectedOrganization.name} • Manage all tasks and workflows
             </p>
           </div>
           
@@ -135,9 +200,28 @@ export default function WorkspacePage() {
             <span className="truncate">New Task</span>
           </button>
         </div>
+
+        {/* Breadcrumbs */}
+        <div className="flex items-center gap-2 text-sm text-slate-500">
+          <button 
+            onClick={() => router.push('/dashboard')}
+            className="hover:text-slate-700 transition-colors"
+          >
+            Organizations
+          </button>
+          <span className="material-symbols-outlined text-base">chevron_right</span>
+          <button 
+            onClick={() => router.push('/boards')}
+            className="hover:text-slate-700 transition-colors"
+          >
+            {selectedOrganization.name}
+          </button>
+          <span className="material-symbols-outlined text-base">chevron_right</span>
+          <span className="text-slate-700 font-medium">{selectedBoard.title}</span>
+        </div>
       </header>
 
-      {/* Advanced Draggable Workspace - FIXED: added onCardClick prop */}
+      {/* Advanced Draggable Workspace */}
       <AdvancedDraggableWorkspace onCardClick={handleCardClick} />
 
       {/* Card Modal */}

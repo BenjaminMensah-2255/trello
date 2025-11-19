@@ -1,65 +1,194 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { createClient } from '../lib/supabase';
+import { useOrganization } from '../contexts/OrganizationContext';
+import CreateBoardModal from '../components/CreateBoardModal';
+
+interface Board {
+  id: string;
+  title: string;
+  backgroundImage: string;
+  altText: string;
+  isStarred: boolean;
+  organization_id: string;
+}
 
 export default function BoardsPage() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [boards, setBoards] = useState([
-    {
-      id: '1',
-      title: 'Q4 Marketing Campaign',
-      backgroundImage: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDyLeD5cfB64FvQQAm0dXu54uiUtmkycQSImTm1M2tL-b-lPYYBSPzxSNaNf4Nu2qdpQj0dtqlV0h6CvzpF0NtQydURF4uiMRFWl4WDe2zGqPZEuGHhG2AbwLelL1KKpREnjm-qYN93cShFZQjWGrEJuMe5c0-Jq3kslgHSTfPyy-vwms5GI1seht4Cwsrl2GquzJdmi19V24PWU7iXthS0HeMqT8M0zC4SbWE1j8-4k9LIFx7aV-BFq_JDEhSe4qMXnThDF6wRP88C',
-      altText: 'A vibrant gradient background for a marketing campaign board',
-      isStarred: false
-    },
-    {
-      id: '2',
-      title: 'Website Redesign',
-      backgroundImage: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDwjik6dofjMEnCEdMybnUSw8kx-vJWTONwfIwgiLOVpvXJJx3a4BA7RnnJt7gt45LMtuk6CpFwIP1WarG5rRYhNC4Hs8dY9XHyKsolRainPFRUmq4S1RTBr5-eRv37087poMfjpYjWVk5wzu3y5NgG1Ryoc4P02bwivxcnytTtMM2KfZDoTr2X2zrv03Sj8HOnbZ68JJmxTRNiAiWdQ2S1FM5-iYCAGRFa9eBSA78lBnaaYCc5wL2V1Dw_mbKbTByDTxklEt8pQnOg',
-      altText: 'A calm blue and purple gradient background for a website redesign board',
-      isStarred: false
-    },
-    {
-      id: '3',
-      title: 'Mobile App v2.0',
-      backgroundImage: 'https://lh3.googleusercontent.com/aida-public/AB6AXuADjm8nnTmCMOqogAiGiwbmtss3LUttoLzQOuZFErqkiMpdQn8uLajpXlZxb5M3UXO7NHCgiKy0HtsQj_2p3ZYTS6Xa2wpvlRwUX8XycfdnwKhbmGvPEoN79tQXyCrgksP3TIYMd-j4x4cIQi8JIs1VOWIwvSvKY9PbjDHBdcX-g3eWkCdaM44EO8EDimDyYuSOBQaGwk9WQ9nyvP4Tal3Dt1wayqC58H-0Qo5IZjEzPff58n8pVb_yBGtu2fsMxfjS3RMB5kMsco1J',
-      altText: 'A dynamic, energetic red gradient background for a mobile app project',
-      isStarred: true
-    },
-    {
-      id: '4',
-      title: 'User Onboarding Flow',
-      backgroundImage: 'https://lh3.googleusercontent.com/aida-public/AB6AXuA5TjJYTQ1MfcBzTSrEAWmanf_o7pP9NOXjv-Fh3oobeE2MfVKiepBwKp-Y_Bh1YrNnvrqqxaBlD_0XWNtn-VYa2j7G1clGG73phzgaJQYU4KrgITjc2_uaQWex_6TVXN78-_m--wkxwV80h6YVBOVFj8xm9E4fIlYzRrePA997uOnMwhkbat7m31DtAuMjNFVE24xWlHElPwtdvXFhT19r-ZfvemHip-CmdAZA61kndW2IBKn_8wbwFy1cNrrtGaJuJ4oe3B5VFmFg',
-      altText: 'A soft, inviting green gradient background for a user onboarding project',
-      isStarred: false
-    },
-    {
-      id: '5',
-      title: '2024 Content Calendar',
-      backgroundImage: 'https://lh3.googleusercontent.com/aida-public/AB6AXuB00L9CjpL2UZn2NfkR18pViXRfPhiGwU3Ff4gH3eXZqHXZ9-CKJ-_H9XPcrjZzdkzmYK9lfeMSlJ_TOdgd1nqCahKGCpqNzXEalU__1-cvXH02ushvy4Q9rmrMqBuz8-soasbDc_svT-gQ2Gq8ZoaFLqni_0LZoT1Oc2mQ94vc4Fsiy9tue6PybI8rvI5SnHCXmVhDjZfv09zXxM4BMbnVAIRcwy9LoXbsfvO5a7Sg5aNE_BtZdlkp9qtZdsn53t2BAduMOBXf7nzg',
-      altText: 'A dark and focused background for a content calendar',
-      isStarred: false
-    },
-    {
-      id: '6',
-      title: 'API Integration',
-      backgroundImage: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBeoC1MXtQTXom0YAkK0Lz2x1Ej5If8dYieTrXBPHQj2QAhbphmAVO1Y4gLMuzf95O2J7l5175SJlR23LK27Wapdc2Asxj6y8Zk1scB6DWKx1VpEcw7JCJbda39APmZFgo_Bvykcvp4JG6zks8igxuwpPtRiIJlV_Af1jkicTSdU4H5kB8JiywT9wVdI1wWl_8QBAIWKi3x8xCSvbZF05r9rdyz0l1juGfBH4dvUIDm616BmmW7ov1kHVOpcN4drIL6T9bR0sQLDt1k',
-      altText: 'A professional, structured background for an API project',
-      isStarred: true
-    }
-  ]);
+  const [boards, setBoards] = useState<Board[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const { selectedOrganization, setSelectedBoard } = useOrganization();
+  const router = useRouter();
+  const supabase = createClient();
 
-  const toggleStar = (boardId: string) => {
-    setBoards(boards.map(board => 
-      board.id === boardId 
-        ? { ...board, isStarred: !board.isStarred }
-        : board
-    ));
+  useEffect(() => {
+    // Redirect if no organization is selected
+    if (!selectedOrganization) {
+      router.push('/dashboard');
+      return;
+    }
+    
+    fetchBoards();
+  }, [selectedOrganization, router]);
+
+  const fetchBoards = async () => {
+    if (!selectedOrganization) return;
+
+    try {
+      const { data: boardsData, error } = await supabase
+        .from('boards')
+        .select('*')
+        .eq('organization_id', selectedOrganization.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Transform the data or use mock data if none exists
+      const transformedBoards: Board[] = (boardsData && boardsData.length > 0) 
+        ? boardsData.map(board => ({
+            id: board.id,
+            title: board.title,
+            backgroundImage: board.background_image || getRandomBackgroundImage(board.title),
+            altText: `Background for ${board.title}`,
+            isStarred: board.is_starred || false,
+            organization_id: board.organization_id
+          }))
+        : [
+            // Mock data for demonstration
+            {
+              id: '1',
+              title: 'Q4 Marketing Campaign',
+              backgroundImage: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDyLeD5cfB64FvQQAm0dXu54uiUtmkycQSImTm1M2tL-b-lPYYBSPzxSNaNf4Nu2qdpQj0dtqlV0h6CvzpF0NtQydURF4uiMRFWl4WDe2zGqPZEuGHhG2AbwLelL1KKpREnjm-qYN93cShFZQjWGrEJuMe5c0-Jq3kslgHSTfPyy-vwms5GI1seht4Cwsrl2GquzJdmi19V24PWU7iXthS0HeMqT8M0zC4SbWE1j8-4k9LIFx7aV-BFq_JDEhSe4qMXnThDF6wRP88C',
+              altText: 'A vibrant gradient background for a marketing campaign board',
+              isStarred: false,
+              organization_id: selectedOrganization.id
+            },
+            {
+              id: '2',
+              title: 'Website Redesign',
+              backgroundImage: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDwjik6dofjMEnCEdMybnUSw8kx-vJWTONwfIwgiLOVpvXJJx3a4BA7RnnJt7gt45LMtuk6CpFwIP1WarG5rRYhNC4Hs8dY9XHyKsolRainPFRUmq4S1RTBr5-eRv37087poMfjpYjWVk5wzu3y5NgG1Ryoc4P02bwivxcnytTtMM2KfZDoTr2X2zrv03Sj8HOnbZ68JJmxTRNiAiWdQ2S1FM5-iYCAGRFa9eBSA78lBnaaYCc5wL2V1Dw_mbKbTByDTxklEt8pQnOg',
+              altText: 'A calm blue and purple gradient background for a website redesign board',
+              isStarred: false,
+              organization_id: selectedOrganization.id
+            }
+          ];
+
+      setBoards(transformedBoards);
+    } catch (error) {
+      console.error('Error fetching boards:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Helper function to get random background images
+  const getRandomBackgroundImage = (boardTitle: string) => {
+    const backgrounds = [
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuDyLeD5cfB64FvQQAm0dXu54uiUtmkycQSImTm1M2tL-b-lPYYBSPzxSNaNf4Nu2qdpQj0dtqlV0h6CvzpF0NtQydURF4uiMRFWl4WDe2zGqPZEuGHhG2AbwLelL1KKpREnjm-qYN93cShFZQjWGrEJuMe5c0-Jq3kslgHSTfPyy-vwms5GI1seht4Cwsrl2GquzJdmi19V24PWU7iXthS0HeMqT8M0zC4SbWE1j8-4k9LIFx7aV-BFq_JDEhSe4qMXnThDF6wRP88C',
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuDwjik6dofjMEnCEdMybnUSw8kx-vJWTONwfIwgiLOVpvXJJx3a4BA7RnnJt7gt45LMtuk6CpFwIP1WarG5rRYhNC4Hs8dY9XHyKsolRainPFRUmq4S1RTBr5-eRv37087poMfjpYjWVk5wzu3y5NgG1Ryoc4P02bwivxcnytTtMM2KfZDoTr2X2zrv03Sj8HOnbZ68JJmxTRNiAiWdQ2S1FM5-iYCAGRFa9eBSA78lBnaaYCc5wL2V1Dw_mbKbTByDTxklEt8pQnOg',
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuADjm8nnTmCMOqogAiGiwbmtss3LUttoLzQOuZFErqkiMpdQn8uLajpXlZxb5M3UXO7NHCgiKy0HtsQj_2p3ZYTS6Xa2wpvlRwUX8XycfdnwKhbmGvPEoN79tQXyCrgksP3TIYMd-j4x4cIQi8JIs1VOWIwvSvKY9PbjDHBdcX-g3eWkCdaM44EO8EDimDyYuSOBQaGwk9WQ9nyvP4Tal3Dt1wayqC58H-0Qo5IZjEzPff58n8pVb_yBGtu2fsMxfjS3RMB5kMsco1J',
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuA5TjJYTQ1MfcBzTSrEAWmanf_o7pP9NOXjv-Fh3oobeE2MfVKiepBwKp-Y_Bh1YrNnvrqqxaBlD_0XWNtn-VYa2j7G1clGG73phzgaJQYU4KrgITjc2_uaQWex_6TVXN78-_m--wkxwV80h6YVBOVFj8xm9E4fIlYzRrePA997uOnMwhkbat7m31DtAuMjNFVE24xWlHElPwtdvXFhT19r-ZfvemHip-CmdAZA61kndW2IBKn_8wbwFy1cNrrtGaJuJ4oe3B5VFmFg',
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuB00L9CjpL2UZn2NfkR18pViXRfPhiGwU3Ff4gH3eXZqHXZ9-CKJ-_H9XPcrjZzdkzmYK9lfeMSlJ_TOdgd1nqCahKGCpqNzXEalU__1-cvXH02ushvy4Q9rmrMqBuz8-soasbDc_svT-gQ2Gq8ZoaFLqni_0LZoT1Oc2mQ94vc4Fsiy9tue6PybI8rvI5SnHCXmVhDjZfv09zXxM4BMbnVAIRcwy9LoXbsfvO5a7Sg5aNE_BtZdlkp9qtZdsn53t2BAduMOBXf7nzg',
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuBeoC1MXtQTXom0YAkK0Lz2x1Ej5If8dYieTrXBPHQj2QAhbphmAVO1Y4gLMuzf95O2J7l5175SJlR23LK27Wapdc2Asxj6y8Zk1scB6DWKx1VpEcw7JCJbda39APmZFgo_Bvykcvp4JG6zks8igxuwpPtRiIJlV_Af1jkicTSdU4H5kB8JiywT9wVdI1wWl_8QBAIWKi3x8xCSvbZF05r9rdyz0l1juGfBH4dvUIDm616BmmW7ov1kHVOpcN4drIL6T9bR0sQLDt1k'
+    ];
+    
+    // Simple hash to get consistent background for same board title
+    const hash = boardTitle.split('').reduce((a, b) => {
+      a = ((a << 5) - a) + b.charCodeAt(0);
+      return a & a;
+    }, 0);
+    
+    return backgrounds[Math.abs(hash) % backgrounds.length];
+  };
+
+  const toggleStar = async (boardId: string) => {
+    try {
+      const board = boards.find(b => b.id === boardId);
+      if (!board) return;
+
+      // Update in Supabase if it's a real board (not mock data)
+      if (!board.id.startsWith('mock-')) {
+        const { error } = await supabase
+          .from('boards')
+          .update({ is_starred: !board.isStarred })
+          .eq('id', boardId);
+
+        if (error) throw error;
+      }
+
+      // Update local state
+      setBoards(boards.map(board => 
+        board.id === boardId 
+          ? { ...board, isStarred: !board.isStarred }
+          : board
+      ));
+    } catch (error) {
+      console.error('Error toggling star:', error);
+    }
+  };
+
+  const handleCreateBoard = async (boardTitle: string) => {
+    if (!selectedOrganization) return;
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      const { data: newBoard, error } = await supabase
+        .from('boards')
+        .insert([
+          {
+            title: boardTitle,
+            organization_id: selectedOrganization.id,
+            background_image: getRandomBackgroundImage(boardTitle),
+            created_by: user.id
+          }
+        ])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Add the new board to the list
+      const transformedBoard: Board = {
+        id: newBoard.id,
+        title: newBoard.title,
+        backgroundImage: newBoard.background_image,
+        altText: `Background for ${newBoard.title}`,
+        isStarred: newBoard.is_starred || false,
+        organization_id: newBoard.organization_id
+      };
+
+      setBoards(prev => [transformedBoard, ...prev]);
+      setIsCreateModalOpen(false);
+    } catch (error) {
+      console.error('Error creating board:', error);
+    }
+  };
+
+  const handleBoardClick = (board: Board) => {
+    // Set the selected board in context
+    setSelectedBoard(board);
+    // Navigate to workspace page
+    router.push('/boards/workspace');
   };
 
   const filteredBoards = boards.filter(board =>
     board.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-7xl">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-lg">Loading boards...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-7xl">
@@ -68,7 +197,7 @@ export default function BoardsPage() {
         <div className="flex flex-col gap-1">
           <h1 className="text-3xl font-bold leading-tight tracking-tight">Boards</h1>
           <p className="text-base font-normal leading-normal text-text-secondary-light">
-            All project boards in your workspace.
+            {selectedOrganization ? `Boards in ${selectedOrganization.name}` : 'All project boards in your workspace.'}
           </p>
         </div>
         <div className="flex items-center gap-4">
@@ -86,7 +215,10 @@ export default function BoardsPage() {
               />
             </div>
           </label>
-          <button className="flex min-w-[84px] cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-lg h-11 px-4 bg-primary text-white text-sm font-medium leading-normal shadow-soft hover:opacity-90 transition-opacity">
+          <button 
+            onClick={() => setIsCreateModalOpen(true)}
+            className="flex min-w-[84px] cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-lg h-11 px-4 bg-primary text-white text-sm font-medium leading-normal shadow-soft hover:opacity-90 transition-opacity"
+          >
             <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>add</span>
             <span className="truncate">Create new board</span>
           </button>
@@ -102,6 +234,7 @@ export default function BoardsPage() {
           {filteredBoards.map((board) => (
             <div 
               key={board.id}
+              onClick={() => handleBoardClick(board)}
               className="group relative flex flex-col justify-end p-4 aspect-[16/10] bg-cover bg-center rounded-xl transition-all shadow-soft hover:shadow-lifted cursor-pointer"
               style={{
                 backgroundImage: `linear-gradient(0deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 40%), url("${board.backgroundImage}")`
@@ -150,13 +283,23 @@ export default function BoardsPage() {
                 Get started by creating a new board for your projects, ideas, or workflows.
               </p>
             </div>
-            <button className="flex min-w-[84px] cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-lg h-11 px-5 bg-primary text-white text-sm font-medium leading-normal shadow-soft hover:opacity-90 transition-opacity">
+            <button 
+              onClick={() => setIsCreateModalOpen(true)}
+              className="flex min-w-[84px] cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-lg h-11 px-5 bg-primary text-white text-sm font-medium leading-normal shadow-soft hover:opacity-90 transition-opacity"
+            >
               <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>add</span>
               <span className="truncate">Create your first board</span>
             </button>
           </div>
         </div>
       )}
+
+      {/* Create Board Modal */}
+      <CreateBoardModal 
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onCreate={handleCreateBoard}
+      />
     </div>
   );
 }
