@@ -11,7 +11,7 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: 'ProjectFlow - Effortless Project Management',
+  title: 'Trello - Effortless Project Management',
   description: 'Organize tasks, collaborate with your team, and ship projects faster with our intuitive visual platform.',
 };
 

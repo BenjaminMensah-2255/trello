@@ -234,7 +234,7 @@ export default function BoardsPage() {
             <div 
               key={board.id}
               onClick={() => handleBoardClick(board)}
-              className="group relative flex flex-col justify-end p-4 aspect-[16/10] bg-cover bg-center rounded-xl transition-all shadow-soft hover:shadow-lifted cursor-pointer"
+              className="group relative flex flex-col justify-end p-4 aspect-16/10 bg-cover bg-center rounded-xl transition-all shadow-soft hover:shadow-lifted cursor-pointer"
               style={{
                 backgroundImage: `linear-gradient(0deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 40%), url("${board.backgroundImage}")`
               }}

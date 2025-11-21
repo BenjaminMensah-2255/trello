@@ -62,7 +62,7 @@ export default function Sidebar() {
                 flowsheet
               </span>
             </div>
-            <h1 className="text-lg font-bold">ProjectFlow</h1>
+            <h1 className="text-lg font-bold">Trello</h1>
           </div>
 
           {/* Navigation */}

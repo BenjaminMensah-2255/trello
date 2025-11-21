@@ -39,7 +39,7 @@ export default function LoginForm() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-text-primary mb-2">Welcome Back</h1>
-          <p className="text-text-secondary">Sign in to your ProjectFlow account</p>
+          <p className="text-text-secondary">Sign in to your Trello account</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-6">

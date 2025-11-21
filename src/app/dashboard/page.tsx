@@ -7,7 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { createClient } from '../lib/supabase';
 import CreateOrganizationModal from '../components/CreateOrganizationModal';
 import EditOrganizationModal from '../components/EditOrganizationModal';
-import { Organization } from '../types/Organization';
+import { Organization } from '../types/organization';
 
 export default function OrganizationsPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -88,7 +88,7 @@ export default function OrganizationsPage() {
         })
       );
 
-      // TypeScript now knows this is Organization[], not (Organization | null)[]
+      
       setOrganizations(organizationsWithCounts);
     } catch (error) {
       console.error('Error fetching organizations:', error);
@@ -251,13 +251,13 @@ export default function OrganizationsPage() {
               onClick={() => handleOrganizationClick(org)}
               className="group relative bg-white rounded-lg border border-border-light shadow-soft hover:shadow-lifted transition-all duration-200 hover:-translate-y-1 cursor-pointer overflow-hidden"
             >
-              <div className="aspect-[4/3] bg-cover bg-center bg-no-repeat relative overflow-hidden">
+              <div className="aspect-4/3 bg-cover bg-center bg-no-repeat relative overflow-hidden">
                 <div 
                   className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-transform group-hover:scale-105"
                   style={{ backgroundImage: `url("${org.imageUrl}")` }}
                   aria-label={org.altText}
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="absolute inset-0 bg-linear-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                 
                 <button
                   onClick={(e) => handleEditClick(e, org)}

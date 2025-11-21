@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Organization } from '../types/Organization';
+import { Organization } from '../types/organization';
 
 interface EditOrganizationModalProps {
   isOpen: boolean;
