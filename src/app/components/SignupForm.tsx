@@ -1,8 +1,7 @@
 "use client"
-
 import { useState, FormEvent } from 'react'
-import { createClient } from '../lib/supabase'
 import { useRouter } from 'next/navigation'
+import { createClient } from '../lib/supabase'
 
 export default function SignupForm() {
   const [email, setEmail] = useState('')
@@ -12,7 +11,7 @@ export default function SignupForm() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const router = useRouter()
-  const supabase = createClient() // Create the client instance here
+  const supabase = createClient()
 
   const handleSignup = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -32,26 +31,23 @@ export default function SignupForm() {
         options: {
           data: {
             full_name: fullName,
-          },
-        },
+          }
+        }
       })
 
       if (error) throw error
 
       if (data.user) {
+        // The handle_new_user() trigger will automatically create the profile
         router.push('/verify-email')
       }
     } catch (error: unknown) {
-      if (error instanceof Error) {
-        setError(error.message)
-      } else {
-        setError('An unexpected error occurred')
-      }
+      console.error('Signup error:', error)
+      setError(error instanceof Error ? error.message : 'Signup failed')
     } finally {
       setLoading(false)
     }
   }
-
   return (
     <div className="flex flex-1 items-center justify-center p-8 bg-background">
       <div className="w-full max-w-md">

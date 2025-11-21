@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, ReactNode } from 'react';
+import { Board } from '../types/board'; 
 
 interface Organization {
   id: string;
@@ -10,14 +11,7 @@ interface Organization {
   altText: string;
 }
 
-interface Board {
-  id: string;
-  title: string;
-  backgroundImage: string;
-  altText: string;
-  isStarred: boolean;
-  organization_id: string;
-}
+
 
 interface OrganizationContextType {
   selectedOrganization: Organization | null;

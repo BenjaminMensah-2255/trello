@@ -1,7 +1,9 @@
+// boards/invites/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useOrganization } from '../../contexts/OrganizationContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { createClient } from '../../lib/supabase';
 
 interface Invitation {
@@ -18,9 +20,10 @@ export default function InvitesPage() {
   const [emailInput, setEmailInput] = useState('');
   const [role, setRole] = useState('member');
   const [pendingInvitations, setPendingInvitations] = useState<Invitation[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const { selectedOrganization } = useOrganization();
+  const { user } = useAuth();
   const supabase = createClient();
 
   useEffect(() => {
@@ -30,137 +33,216 @@ export default function InvitesPage() {
   }, [selectedOrganization]);
 
   const fetchPendingInvitations = async () => {
-    if (!selectedOrganization) return;
+    if (!selectedOrganization || !user) return;
 
     try {
-      const { data, error } = await supabase
-        .from('invitations')
+      setLoading(true);
+      
+      // Check if user has permission to manage invitations
+      const { data: membership } = await supabase
+        .from('organization_members')
+        .select('role')
+        .eq('organization_id', selectedOrganization.id)
+        .eq('user_id', user.id)
+        .single();
+
+      if (membership?.role !== 'admin' && membership?.role !== 'editor') {
+        console.log('User does not have permission to manage invitations');
+        setPendingInvitations([]);
+        return;
+      }
+
+      // Fetch REAL pending invitations from database
+      const { data: invitationsData, error } = await supabase
+        .from('organization_invitations')
         .select('*')
         .eq('organization_id', selectedOrganization.id)
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching invitations:', error);
+        throw error;
+      }
 
-      setPendingInvitations(data || []);
+      console.log('Fetched invitations:', invitationsData);
+      setPendingInvitations(invitationsData || []);
     } catch (error) {
       console.error('Error fetching invitations:', error);
+      setPendingInvitations([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSendInvite = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!emailInput.trim() || !selectedOrganization) return;
+const handleSendInvite = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (!emailInput.trim() || !selectedOrganization || !user) return;
 
-    setSending(true);
-    
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
+  setSending(true);
+  
+  try {
+    // Check if user has permission to send invitations
+    const { data: membership } = await supabase
+      .from('organization_members')
+      .select('role')
+      .eq('organization_id', selectedOrganization.id)
+      .eq('user_id', user.id)
+      .single();
 
-      const emails = emailInput.split(',').map(email => email.trim()).filter(email => email);
-      
-      // Generate invitations for each email
-      const invitations = await Promise.all(
-        emails.map(async (email) => {
-          // Generate a unique token for each invitation
-          const token = await generateInviteToken();
-          
-          const { data: invitation, error } = await supabase
-            .from('invitations')
-            .insert([
-              {
-                organization_id: selectedOrganization.id,
-                email: email.toLowerCase(),
-                token,
-                role,
-                status: 'pending',
-                invited_by: user.id,
-                expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days from now
-              }
-            ])
-            .select()
-            .single();
-
-          if (error) throw error;
-          return invitation;
-        })
-      );
-
-      // Send email invitations (you'll need to set up email service)
-      await sendInvitationEmails(invitations);
-
-      // Refresh the list
-      await fetchPendingInvitations();
-      setEmailInput('');
-      alert('Invitations sent successfully!');
-    } catch (error) {
-      console.error('Error sending invitations:', error);
-      alert('Error sending invitations. Please try again.');
-    } finally {
+    if (!membership || (membership.role !== 'admin' && membership.role !== 'editor')) {
+      alert('You do not have permission to send invitations.');
       setSending(false);
+      return;
     }
-  };
 
-  const generateInviteToken = async (): Promise<string> => {
-    // Generate a random token
-    const array = new Uint8Array(32);
-    crypto.getRandomValues(array);
-    const token = btoa(String.fromCharCode(...array))
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=/g, '');
-    return token;
-  };
+    const emails = emailInput.split(',').map(email => email.trim()).filter(email => email);
+    
+    if (emails.length === 0) {
+      alert('Please enter at least one valid email address.');
+      setSending(false);
+      return;
+    }
 
-  const sendInvitationEmails = async (invitations: any[]) => {
-    // This is where you'd integrate with your email service
-    // For now, we'll just log the invite links
-    invitations.forEach(invitation => {
-      const inviteLink = `${window.location.origin}/invite/accept?token=${invitation.token}`;
-      console.log(`Invitation link for ${invitation.email}: ${inviteLink}`);
+    console.log('Creating invitations for emails:', emails);
+
+    // Create invitations in database first
+    const invitations = emails.map(email => ({
+      organization_id: selectedOrganization.id,
+      email: email.toLowerCase(),
+      role,
+      invited_by: user.id,
+      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+    }));
+
+    const { data: newInvitations, error: insertError } = await supabase
+      .from('organization_invitations')
+      .insert(invitations)
+      .select();
+
+    if (insertError) {
+      console.error('Database error:', insertError);
+      if (insertError.code === '23505') {
+        throw new Error('An invitation has already been sent to one of these email addresses.');
+      } else {
+        throw new Error(`Database error: ${insertError.message}`);
+      }
+    }
+
+    console.log('Database invitations created:', newInvitations);
+
+    // Send email invitations via SMTP
+    const emailResults = [];
+    for (const invitation of newInvitations!) {
+      try {
+        const inviteUrl = `${window.location.origin}/boards/invites/accept?token=${invitation.token}`;
+        
+        console.log('Sending email to:', invitation.email);
+        
+        const response = await fetch('/api/invitations/send', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            to: invitation.email,
+            organizationName: selectedOrganization.name,
+            inviteUrl: inviteUrl,
+            role: invitation.role
+          }),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          console.error(`Email failed for ${invitation.email}:`, result.error);
+          emailResults.push({ 
+            email: invitation.email, 
+            success: false, 
+            error: result.error 
+          });
+          
+          // Optional: Delete the invitation if email failed
+          await supabase
+            .from('organization_invitations')
+            .delete()
+            .eq('id', invitation.id);
+            
+        } else {
+          console.log(`✅ Email sent successfully to ${invitation.email}`);
+          emailResults.push({ 
+            email: invitation.email, 
+            success: true,
+            messageId: result.messageId 
+          });
+        }
+      } catch (emailError: any) {
+        console.error(`Email error for ${invitation.email}:`, emailError);
+        emailResults.push({ 
+          email: invitation.email, 
+          success: false, 
+          error: emailError.message 
+        });
+        
+        // Delete the invitation if email failed
+        await supabase
+          .from('organization_invitations')
+          .delete()
+          .eq('id', invitation.id);
+      }
+    }
+
+    // Check results
+    const successfulEmails = emailResults.filter(result => result.success);
+    const failedEmails = emailResults.filter(result => !result.success);
+
+    // Refresh the invitations list
+    await fetchPendingInvitations();
+    
+    // Show appropriate message
+    if (successfulEmails.length === emails.length) {
+      alert(`🎉 All ${successfulEmails.length} invitations sent successfully! Check your email for the invitation links.`);
+    } else if (successfulEmails.length > 0) {
+      alert(`✅ ${successfulEmails.length} invitation(s) sent successfully.\n\n❌ Failed to send to: ${failedEmails.map(f => f.email).join(', ')}`);
+    } else {
+      alert('❌ Failed to send any invitations. Please check your SMTP configuration and try again.');
       
-      // In a real app, you would send an email here using:
-      // - Resend.com
-      // - SendGrid
-      // - AWS SES
-      // - Nodemailer
-      // etc.
-    });
-
-    // For demo purposes, show the first invite link
-    if (invitations.length > 0) {
-      const inviteLink = `${window.location.origin}/invite/accept?token=${invitations[0].token}`;
-      alert(`Demo: Invite link generated: ${inviteLink}\n\nIn a real app, this would be sent via email.`);
+      // Show detailed error for debugging
+      if (failedEmails.length > 0) {
+        console.error('All emails failed. First error:', failedEmails[0].error);
+      }
     }
-  };
-
+    
+    // Clear form only if some emails were sent successfully
+    if (successfulEmails.length > 0) {
+      setEmailInput('');
+    }
+    
+  } catch (error: any) {
+    console.error('Error sending invitations:', error);
+    alert(error.message || 'Error sending invitations. Please try again.');
+  } finally {
+    setSending(false);
+  }
+};
   const handleResend = async (invitationId: string) => {
+    if (!user) return;
+
     try {
-      const invitation = pendingInvitations.find(inv => inv.id === invitationId);
-      if (!invitation) return;
-
-      // Generate new token and update expiration
-      const newToken = await generateInviteToken();
-      const newExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-
+      // Update expiration date in database
       const { error } = await supabase
-        .from('invitations')
+        .from('organization_invitations')
         .update({
-          token: newToken,
-          expires_at: newExpiresAt,
-          updated_at: new Date().toISOString()
+          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          invited_by: user.id
         })
         .eq('id', invitationId);
 
       if (error) throw error;
 
-      // Send new invitation email
-      const inviteLink = `${window.location.origin}/invite/accept?token=${newToken}`;
-      console.log(`Resent invitation link for ${invitation.email}: ${inviteLink}`);
-      
+      // Refresh the list to show updated data
+      await fetchPendingInvitations();
+
       alert('Invitation resent successfully!');
     } catch (error) {
       console.error('Error resending invitation:', error);
@@ -170,15 +252,17 @@ export default function InvitesPage() {
 
   const handleDelete = async (invitationId: string) => {
     try {
+      // Update invitation status to revoked in database
       const { error } = await supabase
-        .from('invitations')
+        .from('organization_invitations')
         .update({ status: 'revoked' })
         .eq('id', invitationId);
 
       if (error) throw error;
 
-      // Refresh the list
+      // Refresh the list to show updated data
       await fetchPendingInvitations();
+      
       alert('Invitation revoked successfully!');
     } catch (error) {
       console.error('Error revoking invitation:', error);
@@ -267,6 +351,7 @@ export default function InvitesPage() {
                   value={emailInput}
                   onChange={(e) => setEmailInput(e.target.value)}
                   required
+                  disabled={sending}
                 />
               </label>
               
@@ -277,10 +362,12 @@ export default function InvitesPage() {
                   className="w-full rounded-lg border border-border-light bg-background-light px-4 py-2.5 text-sm text-text-light-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
+                  disabled={sending}
                 >
                   <option value="member">Member</option>
                   <option value="editor">Editor</option>
                   <option value="admin">Admin</option>
+                  <option value="viewer">Viewer</option>
                 </select>
               </label>
             </div>
@@ -321,12 +408,12 @@ export default function InvitesPage() {
               return (
                 <div key={invitation.id} className="flex flex-col sm:flex-row sm:items-center gap-4 rounded-lg border border-border-light bg-card-light p-4 shadow-soft">
                   {/* Avatar and Info */}
-                  <div className="flex items-center gap-4 flex-grow">
+                  <div className="flex items-center gap-4 grow">
                     <div className="flex size-10 items-center justify-center rounded-full bg-primary/20 font-bold text-primary">
                       {invitation.email.charAt(0).toUpperCase()}
                     </div>
                     
-                    <div className="flex-grow">
+                    <div className="grow">
                       <div className="text-sm font-medium text-text-light-primary">
                         {invitation.email}
                       </div>

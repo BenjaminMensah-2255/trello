@@ -1,3 +1,4 @@
+"use client";
 export default function Hero() {
   return (
     <section className="text-center py-20 sm:py-28">
@@ -8,7 +9,7 @@ export default function Hero() {
         <p className="text-text-light-secondary dark:text-text-dark-secondary text-base sm:text-lg max-w-2xl">
           Organize tasks, collaborate with your team, and ship projects faster with our intuitive visual platform.
         </p>
-        <button className="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded h-12 px-6 bg-primary text-white text-base font-bold leading-normal tracking-[0.015em] shadow-soft hover:opacity-90 transition-opacity">
+        <button className="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded h-12 px-6 bg-primary text-white text-base font-bold leading-normal tracking-[0.015em] shadow-soft hover:opacity-90 transition-opacity" onClick={() => location.href='/signup'}>
           <span className="truncate">Get Started for Free</span>
         </button>
       </div>

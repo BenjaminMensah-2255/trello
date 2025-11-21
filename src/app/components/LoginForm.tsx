@@ -1,7 +1,7 @@
 "use client"
 import { useState, FormEvent } from 'react'
-import { createClient } from '../lib/supabase'
 import { useRouter } from 'next/navigation'
+import { createClient } from '../lib/supabase'
 
 export default function LoginForm() {
   const [email, setEmail] = useState('')
@@ -24,14 +24,11 @@ export default function LoginForm() {
 
       if (error) throw error
 
-      // Redirect to dashboard or home page
+      // Success - user is authenticated and profile is automatically available
       router.push('/dashboard')
     } catch (error: unknown) {
-      if (error instanceof Error) {
-        setError(error.message)
-      } else {
-        setError('An unexpected error occurred')
-      }
+      console.error('Login error:', error)
+      setError(error instanceof Error ? error.message : 'Login failed')
     } finally {
       setLoading(false)
     }
