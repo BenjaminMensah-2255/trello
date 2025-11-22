@@ -35,7 +35,6 @@ interface Card {
   created_by: string;
   created_at: string;
   updated_at: string;
-  // Computed fields for UI
   attachments_count?: number;
   comments_count?: number;
 }
@@ -282,9 +281,9 @@ export default function AdvancedDraggableWorkspace({ boardId, onCardClick }: Adv
   const createDefaultLists = async () => {
     try {
       const defaultLists = [
-        { title: '📋 To Do', position: 0 },
-        { title: '⚡ In Progress', position: 1 },
-        { title: '👀 In Review', position: 2 },
+        { title: ' To Do', position: 0 },
+        { title: ' In Progress', position: 1 },
+        { title: ' In Review', position: 2 },
         { title: '✅ Done', position: 3 }
       ];
 
