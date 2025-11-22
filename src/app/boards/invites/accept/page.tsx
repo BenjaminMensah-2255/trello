@@ -1,4 +1,3 @@
-// app/boards/invites/accept/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';

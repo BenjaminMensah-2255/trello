@@ -6,7 +6,7 @@ import { useOrganization } from '../contexts/OrganizationContext';
 import { useAuth } from '../contexts/AuthContext';
 import { createClient } from '../lib/supabase';
 import CreateBoardModal from '../components/CreateBoardModal';
-import { Board } from '../types/board'; // Import from shared types
+import { Board } from '../types/board'; 
 
 export default function BoardsPage() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -156,7 +156,7 @@ export default function BoardsPage() {
         ...newBoard,
         backgroundImage: newBoard.background_image || getRandomBackgroundImage(boardTitle),
         altText: `Background for ${boardTitle}`,
-        isStarred: newBoard.is_starred // Add compatibility field
+        isStarred: newBoard.is_starred
       };
 
       setBoards(prev => [transformedBoard, ...prev]);
@@ -164,7 +164,7 @@ export default function BoardsPage() {
       
     } catch (error) {
       console.error('Error creating board:', error);
-      throw error; // Re-throw to be handled by the modal
+      throw error;
     }
   };
 

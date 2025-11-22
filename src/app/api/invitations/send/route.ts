@@ -24,16 +24,16 @@ export async function POST(request: NextRequest) {
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: parseInt(process.env.SMTP_PORT || '465'),
-      secure: usePort465, // true for 465, false for 587
+      secure: usePort465,
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASSWORD,
       },
       tls: {
-        rejectUnauthorized: false, // Less strict for testing
+        rejectUnauthorized: false, 
       },
       // Add connection timeout settings
-      connectionTimeout: 15000, // 15 seconds
+      connectionTimeout: 15000, 
       greetingTimeout: 15000,
       socketTimeout: 15000,
       // Enable debug output

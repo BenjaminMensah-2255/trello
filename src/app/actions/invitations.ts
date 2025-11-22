@@ -1,4 +1,3 @@
-// app/actions/invitations.ts
 'use server';
 
 import { createClient } from '@supabase/supabase-js';

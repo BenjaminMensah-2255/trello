@@ -2,13 +2,13 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useAuth } from '../contexts/AuthContext'; // Adjust path as needed
-import { createClient } from '../lib/supabase'; // Adjust path as needed
+import { useAuth } from '../contexts/AuthContext'; 
+import { createClient } from '../lib/supabase'; 
 import { useRouter } from 'next/navigation';
 
 export default function Sidebar() {
   const [activeItem, setActiveItem] = useState('organizations');
-  const { user, profile } = useAuth(); // Get user and profile from AuthContext
+  const { user, profile } = useAuth(); 
   const supabase = createClient();
   const router = useRouter();
 

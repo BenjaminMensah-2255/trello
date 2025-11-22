@@ -1,4 +1,3 @@
-// boards/[id]/page.tsx (or your workspace route)
 'use client';
 
 import { useState, useEffect } from 'react';
