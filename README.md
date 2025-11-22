@@ -9,6 +9,8 @@ Kanban Boards - Drag-and-drop boards, lists, and cards
 
 Invitation System - Invite team members via email
 
+authentication (login,signup,reset-password and logout)
+
 🛠 Tech Stack
 Frontend: Next.js 14, TypeScript, Tailwind CSS, dnd-kit
 Backend: Supabase (PostgreSQL, Auth, Storage, Real-time)
