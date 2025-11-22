@@ -1,4 +1,3 @@
-// app/dashboard/layout.tsx (or wherever you use Sidebar)
 import { AuthProvider } from '../contexts/AuthContext';
 import Sidebar from '../components/Sidebar';
 
@@ -9,9 +8,9 @@ export default function DashboardLayout({
 }) {
   return (
     <AuthProvider>
-      <div className="flex h-screen">
+      <div className="flex min-h-screen">
         <Sidebar />
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 min-w-0 lg:ml-0">
           {children}
         </main>
       </div>
