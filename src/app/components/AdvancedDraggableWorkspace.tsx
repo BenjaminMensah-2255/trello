@@ -22,25 +22,31 @@ import {
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { createClient } from '../lib/supabase';
-import { useOrganization } from '../contexts/OrganizationContext';
 
 interface Card {
   id: string;
   title: string;
   description?: string;
   image?: string;
-  attachments?: number;
-  comments?: number;
-  dueDate?: string;
-  priority?: 'high' | 'medium';
-  column_id: string;
+  due_date?: string;
+  priority?: 'high' | 'medium' | 'low';
+  list_id: string;
   position: number;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  // Computed fields for UI
+  attachments_count?: number;
+  comments_count?: number;
 }
 
-interface Column {
+interface List {
   id: string;
   title: string;
   position: number;
+  board_id: string;
+  created_at: string;
+  updated_at: string;
   cards: Card[];
 }
 
@@ -80,26 +86,27 @@ function SortableCard({ card, onClick }: { card: Card; onClick?: (card: Card) =>
       
       <p className="text-sm font-medium text-slate-800">{card.title}</p>
       
-      {(card.comments !== undefined || card.attachments !== undefined || card.dueDate !== undefined) && (
+      {(card.comments_count !== undefined || card.attachments_count !== undefined || card.due_date !== undefined) && (
         <div className="mt-2 flex items-center gap-2 text-xs text-slate-500">
-          {card.attachments !== undefined && card.attachments > 0 && (
+          {card.attachments_count !== undefined && card.attachments_count > 0 && (
             <span className="flex items-center gap-1">
               <span className="material-symbols-outlined text-base">attachment</span>
-              {card.attachments}
+              {card.attachments_count}
             </span>
           )}
-          {card.comments !== undefined && card.comments > 0 && (
+          {card.comments_count !== undefined && card.comments_count > 0 && (
             <span className="flex items-center gap-1">
               <span className="material-symbols-outlined text-base">chat_bubble</span>
-              {card.comments}
+              {card.comments_count}
             </span>
           )}
-          {card.dueDate && (
+          {card.due_date && (
             <span className={`flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${
-              card.priority === 'high' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+              card.priority === 'high' ? 'bg-red-100 text-red-700' : 
+              card.priority === 'medium' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
             }`}>
               <span className="material-symbols-outlined text-[12px]">calendar_today</span>
-              {card.dueDate}
+              {new Date(card.due_date).toLocaleDateString()}
             </span>
           )}
         </div>
@@ -108,15 +115,15 @@ function SortableCard({ card, onClick }: { card: Card; onClick?: (card: Card) =>
   );
 }
 
-// Sortable Column Component
-function SortableColumn({ 
-  column, 
+// Sortable List Component
+function SortableList({ 
+  list, 
   onCardClick,
   onAddCard
 }: { 
-  column: Column; 
+  list: List; 
   onCardClick?: (card: Card) => void;
-  onAddCard: (columnId: string) => void;
+  onAddCard: (listId: string) => void;
 }) {
   const {
     attributes,
@@ -125,7 +132,7 @@ function SortableColumn({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: column.id });
+  } = useSortable({ id: list.id });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -147,9 +154,9 @@ function SortableColumn({
           {...listeners}
         >
           <span className="material-symbols-outlined text-lg">drag_indicator</span>
-          {column.title}
+          {list.title}
           <span className="text-sm font-normal text-slate-500 bg-slate-200 px-2 py-1 rounded-full">
-            {column.cards.length}
+            {list.cards.length}
           </span>
         </h2>
         <button className="text-slate-500 hover:text-slate-800 p-1 rounded hover:bg-slate-200 transition-colors">
@@ -157,16 +164,16 @@ function SortableColumn({
         </button>
       </div>
       
-      <SortableContext items={column.cards.map(card => card.id)} strategy={verticalListSortingStrategy}>
+      <SortableContext items={list.cards.map(card => card.id)} strategy={verticalListSortingStrategy}>
         <div className="flex flex-col gap-3 min-h-[100px]">
-          {column.cards.map((card) => (
+          {list.cards.map((card) => (
             <SortableCard key={card.id} card={card} onClick={onCardClick} />
           ))}
         </div>
       </SortableContext>
       
       <button 
-        onClick={() => onAddCard(column.id)}
+        onClick={() => onAddCard(list.id)}
         className="flex w-full items-center justify-center gap-2 rounded-lg py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 transition-colors"
       >
         <span className="material-symbols-outlined">add</span>
@@ -177,16 +184,15 @@ function SortableColumn({
 }
 
 interface AdvancedDraggableWorkspaceProps {
+  boardId: string;
   onCardClick?: (card: Card) => void;
 }
 
-export default function AdvancedDraggableWorkspace({ onCardClick }: AdvancedDraggableWorkspaceProps) {
-  const [columns, setColumns] = useState<Column[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function AdvancedDraggableWorkspace({ boardId, onCardClick }: AdvancedDraggableWorkspaceProps) {
+  const [lists, setLists] = useState<List[]>([]);
+  const [loading, setLoading] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [activeType, setActiveType] = useState<'card' | 'column' | null>(null);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const { selectedBoard } = useOrganization();
+  const [activeType, setActiveType] = useState<'card' | 'list' | null>(null);
   const supabase = createClient();
 
   const sensors = useSensors(
@@ -200,143 +206,117 @@ export default function AdvancedDraggableWorkspace({ onCardClick }: AdvancedDrag
     })
   );
 
-  // Load columns and cards from database
+  // Load workspace data from database
   useEffect(() => {
-    if (selectedBoard) {
+    if (boardId) {
       fetchWorkspaceData();
     }
-  }, [selectedBoard, refreshTrigger]);
+  }, [boardId]);
 
   const fetchWorkspaceData = async () => {
-    if (!selectedBoard) return;
-
     try {
       setLoading(true);
       
-      // Fetch columns
-      const { data: columnsData, error: columnsError } = await supabase
-        .from('columns')
+      // Fetch lists for this board
+      const { data: listsData, error: listsError } = await supabase
+        .from('lists')
         .select('*')
-        .eq('board_id', selectedBoard.id)
-        .order('position');
+        .eq('board_id', boardId)
+        .order('position', { ascending: true });
 
-      if (columnsError) {
-        console.error('Error fetching columns:', columnsError);
-        throw columnsError;
-      }
+      if (listsError) throw listsError;
 
-      // If no columns exist, create default ones
-      if (!columnsData || columnsData.length === 0) {
-        console.log('No columns found, creating default columns');
-        await createDefaultColumns();
+      if (!listsData || listsData.length === 0) {
+        // Create default lists if none exist
+        await createDefaultLists();
         return;
       }
 
-      console.log('Fetched columns:', columnsData);
-
-      // Fetch cards for each column
-      const columnsWithCards = await Promise.all(
-        columnsData.map(async (column) => {
+      // Fetch cards for each list
+      const listsWithCards = await Promise.all(
+        listsData.map(async (list) => {
           const { data: cardsData, error: cardsError } = await supabase
             .from('cards')
             .select('*')
-            .eq('column_id', column.id)
-            .order('position');
+            .eq('list_id', list.id)
+            .order('position', { ascending: true });
 
-          if (cardsError) {
-            console.error(`Error fetching cards for column ${column.id}:`, cardsError);
-            throw cardsError;
-          }
+          if (cardsError) throw cardsError;
 
-          const cards: Card[] = (cardsData || []).map(card => ({
-            id: card.id,
-            title: card.title,
-            description: card.description,
-            attachments: card.attachments,
-            comments: card.comments,
-            dueDate: card.due_date,
-            priority: card.priority as 'high' | 'medium',
-            column_id: card.column_id,
-            position: card.position
-          }));
+          // Fetch counts for attachments and comments
+          const cardsWithCounts = await Promise.all(
+            (cardsData || []).map(async (card) => {
+              const { data: attachmentsData } = await supabase
+                .from('card_attachments')
+                .select('id', { count: 'exact' })
+                .eq('card_id', card.id);
 
-          console.log(`Fetched ${cards.length} cards for column ${column.title}`);
+              const { data: commentsData } = await supabase
+                .from('card_comments')
+                .select('id', { count: 'exact' })
+                .eq('card_id', card.id);
+
+              return {
+                ...card,
+                attachments_count: attachmentsData?.length || 0,
+                comments_count: commentsData?.length || 0
+              };
+            })
+          );
 
           return {
-            id: column.id,
-            title: column.title,
-            position: column.position,
-            cards
+            ...list,
+            cards: cardsWithCounts
           };
         })
       );
 
-      setColumns(columnsWithCards);
-      console.log('Workspace data loaded successfully');
+      setLists(listsWithCards);
     } catch (error) {
       console.error('Error fetching workspace data:', error);
-      alert('Error loading workspace data. Please refresh the page.');
     } finally {
       setLoading(false);
     }
   };
 
-  const createDefaultColumns = async () => {
-    if (!selectedBoard) return;
-
-    const defaultColumns = [
-      { title: '📋 To Do', position: 0 },
-      { title: '⚡ In Progress', position: 1 },
-      { title: '👀 In Review', position: 2 },
-      { title: '✅ Done', position: 3 }
-    ];
-
+  const createDefaultLists = async () => {
     try {
-      const { data: newColumns, error } = await supabase
-        .from('columns')
+      const defaultLists = [
+        { title: '📋 To Do', position: 0 },
+        { title: '⚡ In Progress', position: 1 },
+        { title: '👀 In Review', position: 2 },
+        { title: '✅ Done', position: 3 }
+      ];
+
+      const { data: newLists, error } = await supabase
+        .from('lists')
         .insert(
-          defaultColumns.map(col => ({
-            title: col.title,
-            board_id: selectedBoard.id,
-            position: col.position
+          defaultLists.map(list => ({
+            ...list,
+            board_id: boardId
           }))
         )
         .select();
 
-      if (error) {
-        console.error('Supabase error creating default columns:', error);
-        throw error;
-      }
+      if (error) throw error;
 
-      console.log('Default columns created:', newColumns);
-
-      // Set empty columns
-      const emptyColumns: Column[] = (newColumns || []).map(col => ({
-        id: col.id,
-        title: col.title,
-        position: col.position,
+      const listsWithEmptyCards = (newLists || []).map(list => ({
+        ...list,
         cards: []
       }));
 
-      setColumns(emptyColumns);
+      setLists(listsWithEmptyCards);
     } catch (error) {
-      console.error('Error creating default columns:', error);
-      alert('Error creating default columns. Please try again.');
-    } finally {
-      setLoading(false);
+      console.error('Error creating default lists:', error);
     }
-  };
-
-  const refreshWorkspace = () => {
-    setRefreshTrigger(prev => prev + 1);
   };
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
     setActiveId(active.id as string);
     
-    const isColumn = columns.some(col => col.id === active.id);
-    setActiveType(isColumn ? 'column' : 'card');
+    const isList = lists.some(list => list.id === active.id);
+    setActiveType(isList ? 'list' : 'card');
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -349,321 +329,222 @@ export default function AdvancedDraggableWorkspace({ onCardClick }: AdvancedDrag
     const activeId = active.id as string;
     const overId = over.id as string;
 
-    // Column reordering
-    if (activeType === 'column') {
-      const activeIndex = columns.findIndex(col => col.id === activeId);
-      const overIndex = columns.findIndex(col => col.id === overId);
+    // List reordering
+    if (activeType === 'list') {
+      const activeIndex = lists.findIndex(list => list.id === activeId);
+      const overIndex = lists.findIndex(list => list.id === overId);
 
       if (activeIndex !== -1 && overIndex !== -1 && activeIndex !== overIndex) {
-        const newColumns = arrayMove(columns, activeIndex, overIndex);
+        const newLists = arrayMove(lists, activeIndex, overIndex);
         
         // Update positions in database
-        await updateColumnPositions(newColumns);
-        setColumns(newColumns);
+        await updateListPositions(newLists);
+        setLists(newLists);
       }
       return;
     }
 
     // Card reordering
-    let activeColumnIndex = -1;
+    let activeListIndex = -1;
     let activeCardIndex = -1;
-    let overColumnIndex = -1;
+    let overListIndex = -1;
     let overCardIndex = -1;
 
     // Find active card position
-    columns.forEach((column, colIndex) => {
-      column.cards.forEach((card, cardIndex) => {
+    lists.forEach((list, listIndex) => {
+      list.cards.forEach((card, cardIndex) => {
         if (card.id === activeId) {
-          activeColumnIndex = colIndex;
+          activeListIndex = listIndex;
           activeCardIndex = cardIndex;
         }
       });
     });
 
-    // Check if dropping on a column
-    const targetColumn = columns.find(col => col.id === overId);
-    if (targetColumn) {
-      overColumnIndex = columns.findIndex(col => col.id === overId);
-      overCardIndex = targetColumn.cards.length;
+    // Check if dropping on a list
+    const targetList = lists.find(list => list.id === overId);
+    if (targetList) {
+      overListIndex = lists.findIndex(list => list.id === overId);
+      overCardIndex = targetList.cards.length;
     } else {
       // Find over card position
-      columns.forEach((column, colIndex) => {
-        column.cards.forEach((card, cardIndex) => {
+      lists.forEach((list, listIndex) => {
+        list.cards.forEach((card, cardIndex) => {
           if (card.id === overId) {
-            overColumnIndex = colIndex;
+            overListIndex = listIndex;
             overCardIndex = cardIndex;
           }
         });
       });
     }
 
-    if (activeColumnIndex === -1 || overColumnIndex === -1) return;
+    if (activeListIndex === -1 || overListIndex === -1) return;
 
-    const activeColumn = columns[activeColumnIndex];
-    const targetOverColumn = columns[overColumnIndex];
-    const activeCard = activeColumn.cards[activeCardIndex];
+    const activeList = lists[activeListIndex];
+    const targetOverList = lists[overListIndex];
+    const activeCard = activeList.cards[activeCardIndex];
 
-    let newColumns: Column[];
+    let newLists: List[];
 
-    // Same column reordering
-    if (activeColumnIndex === overColumnIndex) {
+    // Same list reordering
+    if (activeListIndex === overListIndex) {
       const newCards = arrayMove(
-        activeColumn.cards,
+        activeList.cards,
         activeCardIndex,
         overCardIndex
       );
 
-      newColumns = columns.map((col, index) =>
-        index === activeColumnIndex
-          ? { ...col, cards: newCards }
-          : col
+      newLists = lists.map((list, index) =>
+        index === activeListIndex
+          ? { ...list, cards: newCards }
+          : list
       );
+
+      // Update card positions in database
+      await updateCardPositions(newCards, activeList.id);
     } else {
-      // Moving between columns
-      newColumns = columns.map((col, index) => {
-        if (index === activeColumnIndex) {
-          // Remove from active column
+      // Moving between lists
+      newLists = lists.map((list, index) => {
+        if (index === activeListIndex) {
+          // Remove from active list
           return {
-            ...col,
-            cards: col.cards.filter(card => card.id !== activeId)
+            ...list,
+            cards: list.cards.filter(card => card.id !== activeId)
           };
-        } else if (index === overColumnIndex) {
-          // Add to over column
+        } else if (index === overListIndex) {
+          // Add to over list
           const newCard = {
             ...activeCard,
-            column_id: targetOverColumn.id
+            list_id: targetOverList.id
           };
+          const newCards = [
+            ...list.cards.slice(0, overCardIndex),
+            newCard,
+            ...list.cards.slice(overCardIndex)
+          ];
+          
+          // Update card in database
+          updateCardList(newCard.id, targetOverList.id, overCardIndex);
+          
           return {
-            ...col,
-            cards: [
-              ...col.cards.slice(0, overCardIndex),
-              newCard,
-              ...col.cards.slice(overCardIndex)
-            ]
+            ...list,
+            cards: newCards
           };
         }
-        return col;
+        return list;
       });
     }
 
-    // Update database
-    await updateCardPositions(newColumns);
-    setColumns(newColumns);
+    setLists(newLists);
   };
 
-  const updateColumnPositions = async (updatedColumns: Column[]) => {
+  const updateListPositions = async (updatedLists: List[]) => {
     try {
-      const updates = updatedColumns.map((column, index) => ({
-        id: column.id,
-        position: index
+      const updates = updatedLists.map((list, index) => ({
+        id: list.id,
+        position: index,
+        updated_at: new Date().toISOString()
       }));
 
-      console.log('Updating column positions:', updates);
+      const { error } = await supabase
+        .from('lists')
+        .upsert(updates);
 
-      const { data, error } = await supabase
-        .from('columns')
-        .upsert(updates)
-        .select();
-
-      if (error) {
-        console.error('Supabase error updating column positions:', error);
-        throw error;
-      }
-
-      console.log('Column positions updated successfully:', data);
+      if (error) throw error;
     } catch (error) {
-      console.error('Error updating column positions:', error);
+      console.error('Error updating list positions:', error);
     }
   };
 
-  const updateCardPositions = async (updatedColumns: Column[]) => {
-  try {
-    // Filter out mock cards and only update real database cards
-    const cardUpdates = updatedColumns.flatMap(column =>
-      column.cards
-        .filter(card => {
-          // Skip cards that are mock data (they start with 'card-' or 'mock-')
-          const isMockCard = card.id.startsWith('card-') || card.id.startsWith('mock-');
-          if (isMockCard) {
-            console.log('Skipping mock card:', card.id);
-            return false;
-          }
-          // Also validate that we have a valid UUID
-          const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(card.id);
-          if (!isValidUUID) {
-            console.log('Skipping invalid UUID card:', card.id);
-            return false;
-          }
-          return true;
-        })
-        .map((card, index) => ({
-          id: card.id,
-          column_id: column.id,
-          position: index,
-          updated_at: new Date().toISOString() // Add updated_at timestamp
-        }))
-    );
-
-    console.log('Updating card positions for', cardUpdates.length, 'cards:', cardUpdates);
-
-    if (cardUpdates.length === 0) {
-      console.log('No real cards to update positions for');
-      return;
-    }
-
-    // Test database connection first
-    const { data: testData, error: testError } = await supabase
-      .from('cards')
-      .select('id')
-      .limit(1);
-
-    if (testError) {
-      console.error('Database connection test failed:', testError);
-      throw new Error(`Database connection failed: ${testError.message}`);
-    }
-
-    console.log('Database connection test successful');
-
-    // Update cards one by one to identify which one fails
-    const results = [];
-    for (const cardUpdate of cardUpdates) {
-      try {
-        console.log('Updating card:', cardUpdate);
-        
-        const { data, error } = await supabase
-          .from('cards')
-          .update({
-            column_id: cardUpdate.column_id,
-            position: cardUpdate.position,
-            updated_at: cardUpdate.updated_at
-          })
-          .eq('id', cardUpdate.id)
-          .select();
-
-        if (error) {
-          console.error(`Failed to update card ${cardUpdate.id}:`, error);
-          results.push({ success: false, cardId: cardUpdate.id, error });
-        } else {
-          console.log(`Successfully updated card ${cardUpdate.id}:`, data);
-          results.push({ success: true, cardId: cardUpdate.id, data });
-        }
-      } catch (cardError) {
-        console.error(`Error updating card ${cardUpdate.id}:`, cardError);
-        results.push({ success: false, cardId: cardUpdate.id, error: cardError });
-      }
-    }
-
-    // Check if any updates failed
-    const failedUpdates = results.filter(result => !result.success);
-    if (failedUpdates.length > 0) {
-      console.error('Some card updates failed:', failedUpdates);
-      throw new Error(`${failedUpdates.length} card updates failed. Check console for details.`);
-    }
-
-    console.log('All card positions updated successfully');
-    
-    // Refresh workspace to ensure UI is in sync with database
-    refreshWorkspace();
-    
-  } catch (error) {
-    console.error('Error updating card positions:', error);
-    // Don't show alert for position updates as it can be annoying during drag-and-drop
-    console.log('Card position update error (non-critical):', error);
-  }
-};
-  const handleAddCard = async (columnId: string) => {
-    if (!selectedBoard) return;
-
+  const updateCardPositions = async (cards: Card[], listId: string) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
+      const updates = cards.map((card, index) => ({
+        id: card.id,
+        position: index,
+        list_id: listId,
+        updated_at: new Date().toISOString()
+      }));
 
+      const { error } = await supabase
+        .from('cards')
+        .upsert(updates);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error updating card positions:', error);
+    }
+  };
+
+  const updateCardList = async (cardId: string, newListId: string, newPosition: number) => {
+    try {
+      const { error } = await supabase
+        .from('cards')
+        .update({
+          list_id: newListId,
+          position: newPosition,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', cardId);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error updating card list:', error);
+    }
+  };
+
+  const handleAddCard = async (listId: string) => {
+    try {
+      const list = lists.find(l => l.id === listId);
+      if (!list) return;
+
+      // Create card in database
       const { data: newCard, error } = await supabase
         .from('cards')
-        .insert([
-          {
-            title: 'New Task',
-            column_id: columnId,
-            board_id: selectedBoard.id,
-            position: columns.find(col => col.id === columnId)?.cards.length || 0,
-            created_by: user.id
-          }
-        ])
+        .insert({
+          title: 'New Task',
+          list_id: listId,
+          position: list.cards.length,
+          created_by: (await supabase.auth.getUser()).data.user?.id
+        })
         .select()
         .single();
 
-      if (error) {
-        console.error('Supabase error creating card:', error);
-        throw error;
-      }
+      if (error) throw error;
 
-      console.log('New card created:', newCard);
-
-      // Update local state
-      setColumns(prevColumns =>
-        prevColumns.map(column =>
-          column.id === columnId
+      // Add to local state
+      setLists(prevLists =>
+        prevLists.map(l =>
+          l.id === listId
             ? {
-                ...column,
-                cards: [
-                  ...column.cards,
-                  {
-                    id: newCard.id,
-                    title: newCard.title,
-                    description: newCard.description,
-                    attachments: newCard.attachments,
-                    comments: newCard.comments,
-                    dueDate: newCard.due_date,
-                    priority: newCard.priority as 'high' | 'medium',
-                    column_id: newCard.column_id,
-                    position: newCard.position
-                  }
-                ]
+                ...l,
+                cards: [...l.cards, { ...newCard, attachments_count: 0, comments_count: 0 }]
               }
-            : column
+            : l
         )
       );
     } catch (error) {
       console.error('Error creating card:', error);
-      alert('Error creating card. Please try again.');
     }
   };
 
-  const handleAddColumn = async () => {
-    if (!selectedBoard) return;
-
+  const handleAddList = async () => {
     try {
-      const { data: newColumn, error } = await supabase
-        .from('columns')
-        .insert([
-          {
-            title: 'New List',
-            board_id: selectedBoard.id,
-            position: columns.length
-          }
-        ])
+      // Create list in database
+      const { data: newList, error } = await supabase
+        .from('lists')
+        .insert({
+          title: 'New List',
+          board_id: boardId,
+          position: lists.length
+        })
         .select()
         .single();
 
-      if (error) {
-        console.error('Supabase error creating column:', error);
-        throw error;
-      }
+      if (error) throw error;
 
-      console.log('New column created:', newColumn);
-
-      setColumns(prev => [
-        ...prev,
-        {
-          id: newColumn.id,
-          title: newColumn.title,
-          position: newColumn.position,
-          cards: []
-        }
-      ]);
+      // Add to local state
+      setLists(prev => [...prev, { ...newList, cards: [] }]);
     } catch (error) {
-      console.error('Error creating column:', error);
-      alert('Error creating column. Please try again.');
+      console.error('Error creating list:', error);
     }
   };
 
@@ -673,11 +554,11 @@ export default function AdvancedDraggableWorkspace({ onCardClick }: AdvancedDrag
   };
 
   const activeCard = activeId && activeType === 'card' 
-    ? columns.flatMap(col => col.cards).find(card => card.id === activeId)
+    ? lists.flatMap(list => list.cards).find(card => card.id === activeId)
     : null;
 
-  const activeColumn = activeId && activeType === 'column'
-    ? columns.find(col => col.id === activeId)
+  const activeList = activeId && activeType === 'list'
+    ? lists.find(list => list.id === activeId)
     : null;
 
   if (loading) {
@@ -697,12 +578,12 @@ export default function AdvancedDraggableWorkspace({ onCardClick }: AdvancedDrag
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
-        <SortableContext items={columns.map(col => col.id)} strategy={horizontalListSortingStrategy}>
+        <SortableContext items={lists.map(list => list.id)} strategy={horizontalListSortingStrategy}>
           <div className="flex h-full items-start gap-6">
-            {columns.map((column) => (
-              <SortableColumn 
-                key={column.id} 
-                column={column} 
+            {lists.map((list) => (
+              <SortableList 
+                key={list.id} 
+                list={list} 
                 onCardClick={onCardClick}
                 onAddCard={handleAddCard}
               />
@@ -710,7 +591,7 @@ export default function AdvancedDraggableWorkspace({ onCardClick }: AdvancedDrag
             
             {/* Add List Button */}
             <button 
-              onClick={handleAddColumn}
+              onClick={handleAddList}
               className="flex w-80 shrink-0 items-center justify-center gap-2 rounded-xl bg-slate-200/70 px-4 py-3 text-sm font-medium text-slate-600 hover:bg-slate-200 transition-colors border-2 border-dashed border-slate-300 hover:border-slate-400"
             >
               <span className="material-symbols-outlined">add</span>
@@ -723,52 +604,53 @@ export default function AdvancedDraggableWorkspace({ onCardClick }: AdvancedDrag
           {activeCard && (
             <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-xl cursor-grabbing rotate-2 w-80">
               <p className="text-sm font-medium text-slate-800">{activeCard.title}</p>
-              {(activeCard.comments !== undefined || activeCard.attachments !== undefined || activeCard.dueDate !== undefined) && (
+              {(activeCard.comments_count !== undefined || activeCard.attachments_count !== undefined || activeCard.due_date !== undefined) && (
                 <div className="mt-2 flex items-center gap-2 text-xs text-slate-500">
-                  {activeCard.attachments !== undefined && activeCard.attachments > 0 && (
+                  {activeCard.attachments_count !== undefined && activeCard.attachments_count > 0 && (
                     <span className="flex items-center gap-1">
                       <span className="material-symbols-outlined text-base">attachment</span>
-                      {activeCard.attachments}
+                      {activeCard.attachments_count}
                     </span>
                   )}
-                  {activeCard.comments !== undefined && activeCard.comments > 0 && (
+                  {activeCard.comments_count !== undefined && activeCard.comments_count > 0 && (
                     <span className="flex items-center gap-1">
                       <span className="material-symbols-outlined text-base">chat_bubble</span>
-                      {activeCard.comments}
+                      {activeCard.comments_count}
                     </span>
                   )}
-                  {activeCard.dueDate && (
+                  {activeCard.due_date && (
                     <span className={`flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${
-                      activeCard.priority === 'high' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+                      activeCard.priority === 'high' ? 'bg-red-100 text-red-700' : 
+                      activeCard.priority === 'medium' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
                     }`}>
                       <span className="material-symbols-outlined text-[12px]">calendar_today</span>
-                      {activeCard.dueDate}
+                      {new Date(activeCard.due_date).toLocaleDateString()}
                     </span>
                   )}
                 </div>
               )}
             </div>
           )}
-          {activeColumn && (
+          {activeList && (
             <div className="flex w-80 shrink-0 flex-col gap-4 rounded-xl bg-slate-100 p-4 shadow-2xl rotate-2 opacity-90">
               <div className="flex items-center justify-between">
                 <h2 className="font-bold text-slate-800 flex items-center gap-2">
                   <span className="material-symbols-outlined text-lg">drag_indicator</span>
-                  {activeColumn.title}
+                  {activeList.title}
                   <span className="text-sm font-normal text-slate-500 bg-slate-200 px-2 py-1 rounded-full">
-                    {activeColumn.cards.length}
+                    {activeList.cards.length}
                   </span>
                 </h2>
               </div>
               <div className="flex flex-col gap-3">
-                {activeColumn.cards.slice(0, 3).map((card) => (
+                {activeList.cards.slice(0, 3).map((card) => (
                   <div key={card.id} className="rounded-lg border border-slate-200 bg-white p-3 opacity-70">
                     <p className="text-sm text-slate-800">{card.title}</p>
                   </div>
                 ))}
-                {activeColumn.cards.length > 3 && (
+                {activeList.cards.length > 3 && (
                   <div className="text-xs text-slate-500 text-center">
-                    +{activeColumn.cards.length - 3} more cards
+                    +{activeList.cards.length - 3} more cards
                   </div>
                 )}
               </div>

@@ -2,18 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '../lib/supabase';
 import { useOrganization } from '../contexts/OrganizationContext';
+import { useAuth } from '../contexts/AuthContext';
+import { createClient } from '../lib/supabase';
 import CreateBoardModal from '../components/CreateBoardModal';
-
-interface Board {
-  id: string;
-  title: string;
-  backgroundImage: string;
-  altText: string;
-  isStarred: boolean;
-  organization_id: string;
-}
+import { Board } from '../types/board'; 
 
 export default function BoardsPage() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -21,6 +14,7 @@ export default function BoardsPage() {
   const [loading, setLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const { selectedOrganization, setSelectedBoard } = useOrganization();
+  const { user } = useAuth();
   const router = useRouter();
   const supabase = createClient();
 
@@ -35,50 +29,35 @@ export default function BoardsPage() {
   }, [selectedOrganization, router]);
 
   const fetchBoards = async () => {
-    if (!selectedOrganization) return;
+    if (!selectedOrganization || !user) return;
 
     try {
+      setLoading(true);
+      
+      // Fetch boards from database using your schema
       const { data: boardsData, error } = await supabase
         .from('boards')
         .select('*')
         .eq('organization_id', selectedOrganization.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching boards:', error);
+        throw error;
+      }
 
-      // Transform the data or use mock data if none exists
-      const transformedBoards: Board[] = (boardsData && boardsData.length > 0) 
-        ? boardsData.map(board => ({
-            id: board.id,
-            title: board.title,
-            backgroundImage: board.background_image || getRandomBackgroundImage(board.title),
-            altText: `Background for ${board.title}`,
-            isStarred: board.is_starred || false,
-            organization_id: board.organization_id
-          }))
-        : [
-            // Mock data for demonstration
-            {
-              id: '1',
-              title: 'Q4 Marketing Campaign',
-              backgroundImage: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDyLeD5cfB64FvQQAm0dXu54uiUtmkycQSImTm1M2tL-b-lPYYBSPzxSNaNf4Nu2qdpQj0dtqlV0h6CvzpF0NtQydURF4uiMRFWl4WDe2zGqPZEuGHhG2AbwLelL1KKpREnjm-qYN93cShFZQjWGrEJuMe5c0-Jq3kslgHSTfPyy-vwms5GI1seht4Cwsrl2GquzJdmi19V24PWU7iXthS0HeMqT8M0zC4SbWE1j8-4k9LIFx7aV-BFq_JDEhSe4qMXnThDF6wRP88C',
-              altText: 'A vibrant gradient background for a marketing campaign board',
-              isStarred: false,
-              organization_id: selectedOrganization.id
-            },
-            {
-              id: '2',
-              title: 'Website Redesign',
-              backgroundImage: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDwjik6dofjMEnCEdMybnUSw8kx-vJWTONwfIwgiLOVpvXJJx3a4BA7RnnJt7gt45LMtuk6CpFwIP1WarG5rRYhNC4Hs8dY9XHyKsolRainPFRUmq4S1RTBr5-eRv37087poMfjpYjWVk5wzu3y5NgG1Ryoc4P02bwivxcnytTtMM2KfZDoTr2X2zrv03Sj8HOnbZ68JJmxTRNiAiWdQ2S1FM5-iYCAGRFa9eBSA78lBnaaYCc5wL2V1Dw_mbKbTByDTxklEt8pQnOg',
-              altText: 'A calm blue and purple gradient background for a website redesign board',
-              isStarred: false,
-              organization_id: selectedOrganization.id
-            }
-          ];
+      // Transform database data to include UI fields and compatibility
+      const transformedBoards: Board[] = (boardsData || []).map(board => ({
+        ...board,
+        backgroundImage: board.background_image || getRandomBackgroundImage(board.title),
+        altText: `Background for ${board.title}`,
+        isStarred: board.is_starred // Add compatibility field
+      }));
 
       setBoards(transformedBoards);
     } catch (error) {
       console.error('Error fetching boards:', error);
+      setBoards([]);
     } finally {
       setLoading(false);
     }
@@ -106,23 +85,33 @@ export default function BoardsPage() {
 
   const toggleStar = async (boardId: string) => {
     try {
+      if (!user) return;
+
+      // Update in database
       const board = boards.find(b => b.id === boardId);
       if (!board) return;
 
-      // Update in Supabase if it's a real board (not mock data)
-      if (!board.id.startsWith('mock-')) {
-        const { error } = await supabase
-          .from('boards')
-          .update({ is_starred: !board.isStarred })
-          .eq('id', boardId);
+      const newStarredStatus = !board.is_starred;
 
-        if (error) throw error;
-      }
+      const { error } = await supabase
+        .from('boards')
+        .update({ 
+          is_starred: newStarredStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', boardId)
+        .eq('organization_id', selectedOrganization?.id);
 
-      // Update local state
+      if (error) throw error;
+
+      // Update local state - update both database and compatibility fields
       setBoards(boards.map(board => 
         board.id === boardId 
-          ? { ...board, isStarred: !board.isStarred }
+          ? { 
+              ...board, 
+              is_starred: newStarredStatus,
+              isStarred: newStarredStatus // Update compatibility field too
+            }
           : board
       ));
     } catch (error) {
@@ -131,49 +120,59 @@ export default function BoardsPage() {
   };
 
   const handleCreateBoard = async (boardTitle: string) => {
-    if (!selectedOrganization) return;
+    if (!selectedOrganization || !user) {
+      throw new Error('Organization or user not available');
+    }
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
-
+      // Create board in database
       const { data: newBoard, error } = await supabase
         .from('boards')
-        .insert([
-          {
-            title: boardTitle,
-            organization_id: selectedOrganization.id,
-            background_image: getRandomBackgroundImage(boardTitle),
-            created_by: user.id
-          }
-        ])
+        .insert({
+          title: boardTitle,
+          organization_id: selectedOrganization.id,
+          background_image: getRandomBackgroundImage(boardTitle),
+          is_starred: false,
+          created_by: user.id
+        })
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Database error:', error);
+        
+        // Provide user-friendly error messages
+        if (error.code === '23505') {
+          throw new Error('A board with this name already exists in this organization.');
+        } else if (error.code === '42501') {
+          throw new Error('You do not have permission to create boards in this organization.');
+        } else {
+          throw new Error(error.message || 'Failed to create board. Please try again.');
+        }
+      }
 
-      // Add the new board to the list
+      // Transform and add to local state with compatibility fields
       const transformedBoard: Board = {
-        id: newBoard.id,
-        title: newBoard.title,
-        backgroundImage: newBoard.background_image,
-        altText: `Background for ${newBoard.title}`,
-        isStarred: newBoard.is_starred || false,
-        organization_id: newBoard.organization_id
+        ...newBoard,
+        backgroundImage: newBoard.background_image || getRandomBackgroundImage(boardTitle),
+        altText: `Background for ${boardTitle}`,
+        isStarred: newBoard.is_starred
       };
 
       setBoards(prev => [transformedBoard, ...prev]);
       setIsCreateModalOpen(false);
+      
     } catch (error) {
       console.error('Error creating board:', error);
+      throw error;
     }
   };
 
   const handleBoardClick = (board: Board) => {
     // Set the selected board in context
     setSelectedBoard(board);
-    // Navigate to workspace page
-    router.push('/boards/workspace');
+    // Navigate to workspace page - you'll need to create this
+    router.push(`/boards/${board.id}`);
   };
 
   const filteredBoards = boards.filter(board =>
@@ -235,7 +234,7 @@ export default function BoardsPage() {
             <div 
               key={board.id}
               onClick={() => handleBoardClick(board)}
-              className="group relative flex flex-col justify-end p-4 aspect-[16/10] bg-cover bg-center rounded-xl transition-all shadow-soft hover:shadow-lifted cursor-pointer"
+              className="group relative flex flex-col justify-end p-4 aspect-16/10 bg-cover bg-center rounded-xl transition-all shadow-soft hover:shadow-lifted cursor-pointer"
               style={{
                 backgroundImage: `linear-gradient(0deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 40%), url("${board.backgroundImage}")`
               }}
@@ -253,7 +252,7 @@ export default function BoardsPage() {
                     className={`material-symbols-outlined text-white`}
                     style={{ 
                       fontSize: '20px',
-                      fontVariationSettings: board.isStarred ? "'FILL' 1" : "'FILL' 0"
+                      fontVariationSettings: board.is_starred ? "'FILL' 1" : "'FILL' 0"
                     }}
                   >
                     star

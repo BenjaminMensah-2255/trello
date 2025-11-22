@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Poppins } from 'next/font/google';
 import './globals.css';
 import { OrganizationProvider } from './contexts/OrganizationContext';
+import { AuthProvider } from './contexts/AuthContext'
 
 const poppins = Poppins({ 
   subsets: ['latin'],
@@ -10,7 +11,7 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: 'ProjectFlow - Effortless Project Management',
+  title: 'Trello - Effortless Project Management',
   description: 'Organize tasks, collaborate with your team, and ship projects faster with our intuitive visual platform.',
 };
 
@@ -37,9 +38,11 @@ export default function RootLayout({
         `}</style>
       </head>
       <body className="font-display bg-background-light text-text-light-primary">
-        <OrganizationProvider>
-          {children}
-        </OrganizationProvider>
+        <AuthProvider>
+          <OrganizationProvider>
+            {children}
+          </OrganizationProvider>
+        </AuthProvider>
       </body>
     </html>
   );

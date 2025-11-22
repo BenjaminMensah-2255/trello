@@ -2,15 +2,51 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useAuth } from '../contexts/AuthContext'; 
+import { createClient } from '../lib/supabase'; 
+import { useRouter } from 'next/navigation';
 
 export default function Sidebar() {
   const [activeItem, setActiveItem] = useState('organizations');
+  const { user, profile } = useAuth(); 
+  const supabase = createClient();
+  const router = useRouter();
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', href: '/dashboard' },
     { id: 'organizations', label: 'Organizations', icon: 'corporate_fare', href: '/dashboard/organizations' },
     { id: 'settings', label: 'Settings', icon: 'settings', href: '/dashboard/settings' },
   ];
+
+  const handleLogout = async () => {
+    try {
+      console.log('Logging out...');
+      
+      // Sign out from Supabase
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error('Error signing out:', error);
+        alert('Error signing out. Please try again.');
+        return;
+      }
+
+      console.log('Successfully logged out');
+      
+      // Redirect to login page or home page
+      router.push('/');
+      router.refresh(); // Refresh the router to update auth state
+      
+    } catch (error) {
+      console.error('Logout error:', error);
+      alert('An error occurred during logout.');
+    }
+  };
+
+  // Get user display info
+  const userName = profile?.full_name || user?.email?.split('@')[0] || 'User';
+  const userEmail = user?.email || 'email@example.com';
+  const userAvatar = profile?.avatar_url || 'https://lh3.googleusercontent.com/a/default-user';
 
   return (
     <aside className="flex w-64 flex-col bg-content-light p-4 shadow-soft">
@@ -26,7 +62,7 @@ export default function Sidebar() {
                 flowsheet
               </span>
             </div>
-            <h1 className="text-lg font-bold">ProjectFlow</h1>
+            <h1 className="text-lg font-bold">Trello</h1>
           </div>
 
           {/* Navigation */}
@@ -66,15 +102,18 @@ export default function Sidebar() {
             <div 
               className="size-10 rounded-full bg-cover bg-center bg-no-repeat"
               style={{
-                backgroundImage: `url("https://lh3.googleusercontent.com/aida-public/AB6AXuBlbsKBGzNGIVJpPvwCNbVxDzK0HQwTXLfMydYCZL8rd9cb5m7zEQw7MH_Yr52Dk_G2_hChj61CLCgqujuBv4gSYBwu_4xr9pphl57lzlBq3m01om_7Ii97wbTjfWIj3jioWYKOxLAI2tCDrZPRgJCgJZwEioauWKG6ILUMM21GHbLdvgo1QBOsFAv3P6ozQdz7b0MYasVgMyh9BJ016_zHR0orXY7xheGFcZWvvr19SqDww5B1h9zNwxOClIrAdxXJkQzfizYURYW5")`
+                backgroundImage: `url("${userAvatar}")`
               }}
             />
             <div className="flex flex-col">
-              <p className="text-sm font-medium">Alex Johnson</p>
-              <p className="text-xs text-text-secondary-light">alex.j@example.com</p>
+              <p className="text-sm font-medium">{userName}</p>
+              <p className="text-xs text-text-secondary-light">{userEmail}</p>
             </div>
           </div>
-          <button className="flex items-center gap-3 rounded-lg px-3 py-2 text-text-light hover:bg-primary/10 transition-colors">
+          <button 
+            onClick={handleLogout}
+            className="flex items-center gap-3 rounded-lg px-3 py-2 text-text-light hover:bg-red-50 hover:text-red-600 transition-colors"
+          >
             <span className="material-symbols-outlined text-text-secondary-light">logout</span>
             <p className="text-sm font-medium">Logout</p>
           </button>

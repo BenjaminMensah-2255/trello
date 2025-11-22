@@ -1,7 +1,7 @@
 "use client"
 import { useState, FormEvent } from 'react'
-import { createClient } from '../lib/supabase'
 import { useRouter } from 'next/navigation'
+import { createClient } from '../lib/supabase'
 
 export default function LoginForm() {
   const [email, setEmail] = useState('')
@@ -24,14 +24,11 @@ export default function LoginForm() {
 
       if (error) throw error
 
-      // Redirect to dashboard or home page
+      // Success - user is authenticated and profile is automatically available
       router.push('/dashboard')
     } catch (error: unknown) {
-      if (error instanceof Error) {
-        setError(error.message)
-      } else {
-        setError('An unexpected error occurred')
-      }
+      console.error('Login error:', error)
+      setError(error instanceof Error ? error.message : 'Login failed')
     } finally {
       setLoading(false)
     }
@@ -42,7 +39,7 @@ export default function LoginForm() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-text-primary mb-2">Welcome Back</h1>
-          <p className="text-text-secondary">Sign in to your ProjectFlow account</p>
+          <p className="text-text-secondary">Sign in to your Trello account</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-6">

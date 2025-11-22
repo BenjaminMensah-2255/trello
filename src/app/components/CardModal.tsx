@@ -1,20 +1,23 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { createClient } from '../lib/supabase';
 
 export interface Card {
   id: string;
   title: string;
   description?: string;
   image?: string;
-  attachments?: number;
-  comments?: number;
-  dueDate?: string;
-  priority?: 'high' | 'medium';
-  assignee?: string;
-  assignees?: string[];
-  column_id?: string;
-  position?: number;
+  due_date?: string;
+  priority?: 'high' | 'medium' | 'low';
+  list_id: string;
+  position: number;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  // Computed fields for UI
+  attachments_count?: number;
+  comments_count?: number;
 }
 
 interface CardModalProps {
@@ -26,40 +29,62 @@ interface CardModalProps {
 export default function CardModal({ card, onClose, onSave }: CardModalProps) {
   const [editedCard, setEditedCard] = useState<Card>(card);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [attachments, setAttachments] = useState<any[]>([]);
+  const [comments, setComments] = useState<any[]>([]);
+  const supabase = createClient();
 
   // Update local state when card prop changes
   useEffect(() => {
-    console.log('CardModal received card:', card);
     setEditedCard(card);
+    if (card.id) {
+      fetchCardDetails(card.id);
+    }
   }, [card]);
+
+  const fetchCardDetails = async (cardId: string) => {
+    try {
+      // Fetch attachments
+      const { data: attachmentsData } = await supabase
+        .from('card_attachments')
+        .select('*')
+        .eq('card_id', cardId)
+        .order('created_at', { ascending: false });
+
+      // Fetch comments
+      const { data: commentsData } = await supabase
+        .from('card_comments')
+        .select('*, profiles:user_id(full_name, avatar_url)')
+        .eq('card_id', cardId)
+        .order('created_at', { ascending: true });
+
+      setAttachments(attachmentsData || []);
+      setComments(commentsData || []);
+    } catch (error) {
+      console.error('Error fetching card details:', error);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Submit button clicked');
-    console.log('Edited card data:', editedCard);
     
     setIsSubmitting(true);
     
     try {
       // Validate required fields
       if (!editedCard.title.trim()) {
-        console.error('Title is required');
         alert('Title is required');
         return;
       }
       
-      console.log('Calling onSave with:', editedCard);
       await onSave(editedCard);
-      console.log('onSave completed successfully');
     } catch (error) {
-      console.error('Error in handleSubmit:', error);
+      console.error('Error saving card:', error);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleOverlayClick = (e: React.MouseEvent) => {
-    console.log('Overlay clicked');
     if (e.target === e.currentTarget) {
       onClose();
     }
@@ -76,7 +101,6 @@ export default function CardModal({ card, onClose, onSave }: CardModalProps) {
   };
 
   const handleInputChange = (field: keyof Card, value: any) => {
-    console.log(`Field ${field} changed to:`, value);
     setEditedCard(prev => ({
       ...prev,
       [field]: value
@@ -153,8 +177,8 @@ export default function CardModal({ card, onClose, onSave }: CardModalProps) {
             <input
               id="card-due-date"
               type="date"
-              value={formatDateForInput(editedCard.dueDate)}
-              onChange={(e) => handleInputChange('dueDate', e.target.value)}
+              value={formatDateForInput(editedCard.due_date)}
+              onChange={(e) => handleInputChange('due_date', e.target.value)}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
             />
           </div>
@@ -171,6 +195,7 @@ export default function CardModal({ card, onClose, onSave }: CardModalProps) {
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
             >
               <option value="">No priority</option>
+              <option value="low">Low</option>
               <option value="medium">Medium</option>
               <option value="high">High</option>
             </select>
@@ -178,26 +203,18 @@ export default function CardModal({ card, onClose, onSave }: CardModalProps) {
 
           {/* Card Metadata */}
           <div className="grid grid-cols-2 gap-4 text-sm text-slate-600">
-            {editedCard.attachments !== undefined && (
+            {attachments.length > 0 && (
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-base">attachment</span>
-                <span>{editedCard.attachments} attachments</span>
+                <span>{attachments.length} attachments</span>
               </div>
             )}
-            {editedCard.comments !== undefined && (
+            {comments.length > 0 && (
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-base">chat_bubble</span>
-                <span>{editedCard.comments} comments</span>
+                <span>{comments.length} comments</span>
               </div>
             )}
-          </div>
-
-          {/* Debug Info (remove in production) */}
-          <div className="p-4 bg-slate-100 rounded-lg text-xs">
-            <p><strong>Debug Info:</strong></p>
-            <p>Card ID: {editedCard.id}</p>
-            <p>Title: {editedCard.title}</p>
-            <p>Submitting: {isSubmitting ? 'Yes' : 'No'}</p>
           </div>
 
           {/* Action Buttons */}

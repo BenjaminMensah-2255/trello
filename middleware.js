@@ -27,7 +27,6 @@ export async function middleware(req) {
 
   const { pathname } = req.nextUrl
 
-  // Auth routes - redirect to dashboard if already authenticated
   if (pathname.startsWith('/login') && session) {
     return NextResponse.redirect(new URL('/dashboard', req.url))
   }
@@ -44,7 +43,6 @@ export async function middleware(req) {
     return NextResponse.redirect(new URL('/dashboard', req.url))
   }
 
-  // Protected routes - redirect to login if not authenticated
   if (pathname.startsWith('/dashboard') && !session) {
     return NextResponse.redirect(new URL('/login', req.url))
   }

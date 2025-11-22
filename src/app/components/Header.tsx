@@ -11,7 +11,7 @@ export default function Header() {
                 <path d="M12.75 2.75a.75.75 0 00-1.5 0v8.5h-1.5a.75.75 0 000 1.5h1.5v7a.75.75 0 001.5 0v-7h1.5a.75.75 0 000-1.5h-1.5V2.75zM6 6a.75.75 0 01.75-.75h2.5a.75.75 0 010 1.5H6.75A.75.75 0 016 6zm-2.25 7.5a.75.75 0 000 1.5h2.5a.75.75 0 000-1.5h-2.5zM14.25 8a.75.75 0 000 1.5h3.5a.75.75 0 000-1.5h-3.5zm0 8.5a.75.75 0 000 1.5h2.5a.75.75 0 000-1.5h-2.5z"></path>
               </svg>
             </div>
-            <h2 className="text-text-light-primary dark:text-text-dark-primary text-xl font-bold leading-tight">ProjectFlow</h2>
+            <h2 className="text-text-light-primary dark:text-text-dark-primary text-xl font-bold leading-tight">Trello</h2>
           </div>
 
           <div className="hidden md:flex flex-1 justify-center items-center gap-8">

@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { useOrganization } from '../../contexts/OrganizationContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { createClient } from '../../lib/supabase';
 import AdvancedDraggableWorkspace from '../../components/AdvancedDraggableWorkspace';
 import CardModal from '../../components/CardModal';
@@ -15,21 +16,33 @@ interface Card {
   image?: string;
   attachments?: number;
   comments?: number;
-  dueDate?: string;
-  priority?: 'high' | 'medium';
+  due_date?: string;
+  priority?: 'high' | 'medium' | 'low';
   assignee?: string;
   assignees?: string[];
-  column_id?: string;
-  position?: number;
+  list_id: string;
+  position: number;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export default function WorkspacePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [boardMembers, setBoardMembers] = useState<any[]>([]);
   const { selectedOrganization, selectedBoard } = useOrganization();
+  const { user } = useAuth();
   const router = useRouter();
+  const params = useParams();
   const supabase = createClient();
+
+  useEffect(() => {
+    if (selectedBoard && selectedOrganization) {
+      fetchBoardMembers();
+    }
+  }, [selectedBoard, selectedOrganization]);
 
   useEffect(() => {
     // Redirect if no board is selected
@@ -39,60 +52,84 @@ export default function WorkspacePage() {
     }
   }, [selectedBoard, selectedOrganization, router]);
 
+  const fetchBoardMembers = async () => {
+    if (!selectedOrganization || !selectedBoard) return;
+
+    try {
+      // Fetch organization members who have access to this board
+      const { data: membersData, error } = await supabase
+        .from('organization_members')
+        .select(`
+          role,
+          profiles:user_id (
+            id,
+            full_name,
+            email,
+            avatar_url
+          )
+        `)
+        .eq('organization_id', selectedOrganization.id)
+        .limit(5); // Limit for the avatar display
+
+      if (error) throw error;
+
+      const transformedMembers = (membersData || [])
+        .filter(member => member.profiles && member.profiles[0])
+        .map(member => ({
+          id: member.profiles[0].id,
+          name: member.profiles[0].full_name || member.profiles[0].email.split('@')[0],
+          email: member.profiles[0].email,
+          avatar_url: member.profiles[0].avatar_url,
+          role: member.role
+        }));
+
+      setBoardMembers(transformedMembers);
+    } catch (error) {
+      console.error('Error fetching board members:', error);
+    }
+  };
+
   const handleCardClick = (card: Card) => {
-    console.log('Workspace: Card clicked:', card);
     setSelectedCard(card);
     setIsModalOpen(true);
   };
 
   const handleCloseModal = () => {
-    console.log('Workspace: Closing modal');
     setIsModalOpen(false);
     setSelectedCard(null);
   };
 
   const handleSaveCard = async (updatedCard: Card) => {
-    console.log('Workspace: Saving card:', updatedCard);
-    
     try {
-      // Prepare the data for Supabase
-      const cardData = {
-        title: updatedCard.title,
-        description: updatedCard.description || null,
-        due_date: updatedCard.dueDate || null,
-        priority: updatedCard.priority || 'medium',
-        attachments: updatedCard.attachments || 0,
-        comments: updatedCard.comments || 0,
-        updated_at: new Date().toISOString()
-      };
+      if (!user) throw new Error('User not authenticated');
 
-      console.log('Workspace: Updating card with data:', cardData);
-
-      const { data, error } = await supabase
+      // Update card in database
+      const { error } = await supabase
         .from('cards')
-        .update(cardData)
-        .eq('id', updatedCard.id)
-        .select();
+        .update({
+          title: updatedCard.title,
+          description: updatedCard.description,
+          image: updatedCard.image,
+          due_date: updatedCard.due_date,
+          priority: updatedCard.priority,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', updatedCard.id);
 
-      if (error) {
-        console.error('Workspace: Supabase error:', error);
-        throw error;
-      }
+      if (error) throw error;
 
-      console.log('Workspace: Card saved successfully:', data);
+      console.log('Card saved successfully:', updatedCard);
       
       // Close modal after successful save
       setIsModalOpen(false);
       setSelectedCard(null);
 
-      // You might want to refresh the workspace data here
-      // or update the local state to reflect changes
-      // For now, let's just show a success message
+      // Show success message
       alert('Card saved successfully!');
 
     } catch (error) {
-      console.error('Workspace: Error saving card:', error);
-      alert('Error saving card. Please check console for details.');
+      console.error('Error saving card:', error);
+      alert('Error saving card. Please try again.');
     }
   };
 
@@ -123,35 +160,30 @@ export default function WorkspacePage() {
           <div className="flex items-center gap-4">
             {/* Avatar Group */}
             <div className="flex items-center">
-              <div className="-ml-3 h-10 w-10 overflow-visible">
-                <div 
-                  className="h-full w-full rounded-full border-2 border-white bg-cover bg-center shadow-sm"
-                  style={{
-                    backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuBebaIDpo4Ll_v-119E3GPalCL9GItmbPFsqC6H_bY8-30aNTq2YuusjV1lAbQSJftiZS2W-OabNktxE38aUoe_zBQ4tOObJyhuA0HCctd3A1FrhCes0xbNEhQDJrrSKE1sNJDwpGwHImyqEewLHza5BtECClG_v56a_eNBgxA9eC3f5GCTe60bpHU1wi2sAyYoQ8TnHi5sN4yemAPlv3qybAcCm_lr_ISRTMj3CZ4Uf_Flblgi68FQHJH1y1Y-UG4_SmOGjGXVdedu")'
-                  }}
-                />
-              </div>
-              <div className="-ml-3 h-10 w-10 overflow-visible">
-                <div 
-                  className="h-full w-full rounded-full border-2 border-white bg-cover bg-center shadow-sm"
-                  style={{
-                    backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuCKe3xK5Tyth5TX1n2GW9J3V0kEiymzrlcQjeM4dEtIWBiCYlbrOFFOIYHg4IUPL59Sv50aFL6ENc6gTVUnD1iCxgKGDF0nQGRyMgWKNFaLXNTUv-J9NRK_yNGH2mr-q2-VukHPPx_WLsOGkKHF1C8LYhg2_kDxor1DTz0CP7wWEXZIDPfkVq2YmFbyQBBWa2W7TkaAfFdjf22XhrLiqvqmzGn8tvMlrC_syrtdGKIk_AelADSa2sRlB0DNYyhPwA8XZpFD6uMsn2BD")'
-                  }}
-                />
-              </div>
-              <div className="-ml-3 h-10 w-10 overflow-visible">
-                <div 
-                  className="h-full w-full rounded-full border-2 border-white bg-cover bg-center shadow-sm"
-                  style={{
-                    backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuBPvXmbDbyHTPo3REQUf_oGJWGX9_nYwSz21a1mXhayeAlF07pl5ga0hRtNYYmKFvKbqhciKEwMYDAkcwAy1IVvLdI0igqCabF9Eyebmc_uDLGfSl_ty9l4mkI5EimAqB2wo_TX_SRZuNkdTvjgR_wmUadH0Oj4IbkMGZetkokTOxi7gBHg_7CGwfg6PXpfMmBIY6KPz9BZddneVNY8H-VLD1oCALs3jTdlMcITQ9cg1LU7nQgnO1sUKN9Y3SHHBDKkB-NJCUedzRLb")'
-                  }}
-                />
-              </div>
-              <div className="-ml-3 h-10 w-10 overflow-visible">
-                <div className="flex h-full w-full items-center justify-center rounded-full border-2 border-white bg-slate-200 text-sm font-semibold text-slate-600 shadow-sm">
-                  +5
+              {boardMembers.slice(0, 3).map((member, index) => (
+                <div key={member.id} className={`h-10 w-10 overflow-visible ${index > 0 ? '-ml-3' : ''}`}>
+                  <div 
+                    className="h-full w-full rounded-full border-2 border-white bg-cover bg-center shadow-sm"
+                    style={{
+                      backgroundImage: member.avatar_url ? `url("${member.avatar_url}")` : 'none',
+                      backgroundColor: !member.avatar_url ? '#e2e8f0' : undefined
+                    }}
+                  >
+                    {!member.avatar_url && (
+                      <div className="w-full h-full rounded-full flex items-center justify-center text-slate-600 font-medium text-sm">
+                        {member.name.split(' ').map((n: string) => n[0]).join('')}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
+              ))}
+              {boardMembers.length > 3 && (
+                <div className="-ml-3 h-10 w-10 overflow-visible">
+                  <div className="flex h-full w-full items-center justify-center rounded-full border-2 border-white bg-slate-200 text-sm font-semibold text-slate-600 shadow-sm">
+                    +{boardMembers.length - 3}
+                  </div>
+                </div>
+              )}
             </div>
             
             <button className="flex min-w-[84px] cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-lg h-10 px-4 bg-primary text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-primary/90 transition-colors">
@@ -222,7 +254,10 @@ export default function WorkspacePage() {
       </header>
 
       {/* Advanced Draggable Workspace */}
-      <AdvancedDraggableWorkspace onCardClick={handleCardClick} />
+      <AdvancedDraggableWorkspace 
+        boardId={selectedBoard.id} 
+        onCardClick={handleCardClick} 
+      />
 
       {/* Card Modal */}
       {isModalOpen && selectedCard && (

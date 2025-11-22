@@ -1,16 +1,20 @@
+// app/dashboard/layout.tsx (or wherever you use Sidebar)
+import { AuthProvider } from '../contexts/AuthContext';
 import Sidebar from '../components/Sidebar';
 
-interface DashboardLayoutProps {
+export default function DashboardLayout({
+  children,
+}: {
   children: React.ReactNode;
-}
-
-export default function DashboardLayout({ children }: DashboardLayoutProps) {
+}) {
   return (
-    <div className="flex min-h-screen bg-background-light text-text-light">
-      <Sidebar />
-      <main className="flex-1 p-8">
-        {children}
-      </main>
-    </div>
+    <AuthProvider>
+      <div className="flex h-screen">
+        <Sidebar />
+        <main className="flex-1 overflow-auto">
+          {children}
+        </main>
+      </div>
+    </AuthProvider>
   );
 }
