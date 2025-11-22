@@ -1,36 +1,65 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+Trello Clone
+A full-featured project management app built with Next.js 14 and Supabase.
 
-## Getting Started
+🚀 Features
+Organizations & Teams - Manage multiple teams with role-based permissions
 
-First, run the development server:
+Kanban Boards - Drag-and-drop boards, lists, and cards
 
-```bash
+Invitation System - Invite team members via email
+
+🛠 Tech Stack
+Frontend: Next.js 14, TypeScript, Tailwind CSS, dnd-kit
+Backend: Supabase (PostgreSQL, Auth, Storage, Real-time)
+
+📦 Quick Setup
+1. Environment Setup
+bash
+# Clone and install
+git clone https://github.com/BenjaminMensah-2255/trello.git
+cd trello
+npm install
+
+# Environment variables (.env.local)
+NEXT_PUBLIC_SUPABASE_URL=your_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+2. Database Setup
+Run the SQL schema in your Supabase SQL Editor to create:
+
+Users, Organizations, Members
+
+Boards, Lists, Cards
+
+Activities, Comments, Attachments
+
+Row Level Security policies
+
+3. Run the App
+
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+Visit http://localhost:3000
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+🎯 Getting Started
+Sign up for an account
 
-## Learn More
+Login
 
-To learn more about Next.js, take a look at the following resources:
+Create an organization
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Create boards and start organizing tasks
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Invite team members (boards/invites)
 
-## Deploy on Vercel
+Drag & drop cards between lists
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+🚀 Deployment
+Deploy to Vercel in minutes:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Connect your GitHub repo
+
+Add environment variables
+
+Deploy!
