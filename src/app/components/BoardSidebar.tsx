@@ -15,7 +15,7 @@ export default function BoardSidebar() {
   const menuItems = [
     { id: 'boards', label: 'Boards', icon: 'view_kanban', href: '/boards' },
     { id: 'members', label: 'Members', icon: 'group', href: '/boards/members' },
-    { id: 'settings', label: 'Settings', icon: 'settings', href: '/boards/settings' },
+    { id: 'settings', label: 'Settings', icon: 'settings', href: '/boards/members' },
   ];
 
   const handleLogout = async () => {

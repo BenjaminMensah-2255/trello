@@ -15,8 +15,8 @@ export default function Sidebar() {
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', href: '/dashboard' },
-    { id: 'organizations', label: 'Organizations', icon: 'corporate_fare', href: '/dashboard/organizations' },
-    { id: 'settings', label: 'Settings', icon: 'settings', href: '/dashboard/settings' },
+    { id: 'organizations', label: 'Organizations', icon: 'corporate_fare', href: '/dashboard/dashboard' },
+    { id: 'settings', label: 'Settings', icon: 'settings', href: '/dashboard/dashboard' },
   ];
 
   const handleLogout = async () => {
