@@ -1,4 +1,5 @@
-Trello Clone
+## Trello Clone
+
 A full-featured project management app built with Next.js 14 and Supabase.
 
 🚀 Features
@@ -24,6 +25,7 @@ npm install
 NEXT_PUBLIC_SUPABASE_URL=your_project_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+
 2. Database Setup
 Run the SQL schema in your Supabase SQL Editor to create:
 
@@ -38,22 +40,23 @@ Row Level Security policies
 3. Run the App
 
 npm run dev
-Visit http://localhost:3000
+## Visit http://localhost:3000
 
 
 
-🎯 Getting Started
-Sign up for an account
+## 🎯 Getting Started
 
-Login
+1. Sign up for an account
 
-Create an organization
+2. Login
 
-Create boards and start organizing tasks
+3. Create an organization
 
-Invite team members (boards/invites)
+4. Create boards and start organizing tasks
 
-Drag & drop cards between lists
+5. Invite team members (boards/invites)
+
+6. Drag & drop cards between lists
 
 🚀 Deployment
 Deploy to Vercel in minutes:
